@@ -29,7 +29,7 @@ services:
       dockerfile: Dockerfile
     container_name: cashmate-api
     restart: always
-    # Hanya bisa diakses dari VPS sendiri (localhost:8081).
+    # Hanya bisa diakses dari VPS sendiri (localhost:8096).
     # Publik mengakses lewat nginx (80/443).
     ports:
       - "127.0.0.1:8096:8096"
@@ -42,7 +42,7 @@ services:
       # IP nginx di dalam Docker network — untuk menghitung ClientIP yang benar.
       TRUSTED_PROXIES: 172.20.0.10
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/api/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8096/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5

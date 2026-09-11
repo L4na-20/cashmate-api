@@ -29,6 +29,6 @@ WORKDIR /app
 # Copy binary dari stage sebelumnya
 COPY --from=builder /app/cashmate-api .
 
-EXPOSE 8081
+EXPOSE 8096
 
 ENTRYPOINT ["./cashmate-api"]

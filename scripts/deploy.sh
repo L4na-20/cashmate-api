@@ -54,9 +54,9 @@ docker compose up -d --build
 
 echo "==> [4/4] Health check..."
 for i in $(seq 1 30); do
-  if curl -fsS http://localhost:8081/api/health >/dev/null 2>&1; then
+  if curl -fsS http://localhost:8096/api/health >/dev/null 2>&1; then
     echo ""
-    echo "✔ Deploy sukses! API sehat di http://localhost:8081/api/health"
+    echo "✔ Deploy sukses! API sehat di http://localhost:8096/api/health"
     exit 0
   fi
   sleep 2
