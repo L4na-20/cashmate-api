@@ -48,7 +48,8 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - cashmate-net
+      cashmate-net:
+        ipv4_address: 172.20.0.11
 
   # =====================
   # Service Database (MySQL 8.0)
