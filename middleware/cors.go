@@ -4,20 +4,17 @@ import (
 	"net/http"
 	"time"
 
+	"cashmate-api/config"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-// CORS menyediakan konfigurasi CORS yang ketat. Hanya origin yang
-// ada di daftar yang diizinkan mengakses API.
+// CORS menyediakan konfigurasi CORS yang ketat. Origin yang diizinkan
+// diambil dari env CORS_ORIGINS (dipisahkan koma).
 func CORS() gin.HandlerFunc {
-	config := cors.Config{
+	corsCfg := cors.Config{
 		AllowAllOrigins: false,
-		AllowOrigins: []string{
-			"http://localhost:8000",
-			"http://127.0.0.1:8000",
-			"http://localhost:3000",
-		},
+		AllowOrigins:    config.AllowedOrigins(),
 		AllowMethods: []string{
 			http.MethodGet, http.MethodPost, http.MethodPut,
 			http.MethodPatch, http.MethodDelete, http.MethodOptions,
@@ -28,5 +25,5 @@ func CORS() gin.HandlerFunc {
 		MaxAge:           12 * time.Hour,
 	}
 
-	return cors.New(config)
+	return cors.New(corsCfg)
 }

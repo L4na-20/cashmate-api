@@ -1,0 +1,25 @@
+# ===== Environment =====
+# Kredensial asli JANGAN pernah di-commit ke git
+.env
+.env.*
+!.env.example
+
+# ===== Go build artifacts =====
+cashmate-api
+*.exe
+*.test
+*.out
+bin/
+coverage/
+
+# ===== IDE & Editor =====
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ===== Logs =====
+*.log
+logs/

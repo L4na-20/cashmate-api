@@ -1,0 +1,110 @@
+services:
+  # =====================
+  # Service Nginx (Reverse Proxy + HTTPS)
+  # Satu-satunya pintu masuk dari internet (port 80/443).
+  # =====================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cashmate-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_certbot_www:/var/www/certbot:ro
+      - nginx_certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - api
+    networks:
+      cashmate-net:
+        ipv4_address: 172.20.0.10
+
+  # =====================
+  # Service API (Golang)
+  # =====================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cashmate-api
+    restart: always
+    # Hanya bisa diakses dari VPS sendiri (localhost:8081).
+    # Publik mengakses lewat nginx (80/443).
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # IP nginx di dalam Docker network — untuk menghitung ClientIP yang benar.
+      TRUSTED_PROXIES: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - cashmate-net
+
+  # =====================
+  # Service Database (MySQL 8.0)
+  # =====================
+  db:
+    image: mysql:8.0
+    container_name: cashmate-db
+    restart: always
+    # Tidak boleh terbuka ke publik. Hanya lokal VPS (127.0.0.1).
+    ports:
+      - "127.0.0.1:${MYSQL_HOST_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - cashmate-net
+
+  # =====================
+  # Service Certbot (Renewal SSL otomatis tiap 12 jam)
+  # =====================
+  certbot:
+    image: certbot/certbot:latest
+    container_name: cashmate-certbot
+    restart: unless-stopped
+    volumes:
+      - nginx_certbot_www:/var/www/certbot
+      - nginx_certbot_certs:/etc/letsencrypt
+    depends_on:
+      - nginx
+    entrypoint: >
+      sh -c 'trap exit TERM;
+      while :; do
+        certbot renew;
+        sleep 12h & wait $${!};
+      done;'
+
+# Named volume untuk persistensi data MySQL + sertifikat SSL
+volumes:
+  mysql_data:
+  nginx_certbot_www:
+  nginx_certbot_certs:
+
+# Bridge network dengan subnet fix agar IP nginx bisa dipakai sebagai trusted proxy
+networks:
+  cashmate-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24

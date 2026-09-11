@@ -1,6 +1,6 @@
 package models
 
-import "../../API/models/time"
+import "time"
 
 type Transaction struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`

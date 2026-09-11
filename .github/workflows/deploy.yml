@@ -1,0 +1,70 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cashmate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================
+  # CI — build & validasi di setiap push / PR
+  # ============================================
+  ci:
+    name: CI - Build & Vet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build & Vet
+        run: |
+          go build ./...
+          go vet ./...
+
+      - name: Build Docker image (validasi Dockerfile)
+        run: docker build -t cashmate-api:ci .
+
+  # ============================================
+  # CD — deploy ke VPS saat push ke main
+  # ============================================
+  deploy:
+    name: CD - Deploy ke VPS
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          command_timeout: "20m"
+          script: |
+            export REPO_URL="${{ secrets.VPS_REPO_URL }}"
+            export DEPLOY_PATH="${{ secrets.VPS_DEPLOY_PATH }}"
+            export BRANCH="main"
+
+            # Skrip deploy tersimpan di dalam repo itu sendiri.
+            # Jika repo belum pernah di-clone, clone dulu dengan token/deploy key.
+            if [ ! -d "$DEPLOY_PATH" ]; then
+              echo "==> $DEPLOY_PATH belum ada, menjalankan clone pertama..."
+              bash -c "cd $(dirname "$DEPLOY_PATH") && git clone --branch \"$BRANCH\" \"$REPO_URL\" \"$DEPLOY_PATH\""
+            fi
+
+            bash "$DEPLOY_PATH/scripts/deploy.sh"
