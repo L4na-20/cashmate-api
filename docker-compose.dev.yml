@@ -1,0 +1,47 @@
+services:
+  db:
+    image: mysql:8.4
+    container_name: cashmate-db-dev
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: cashmate_dev
+      MYSQL_USER: cashmate
+      MYSQL_PASSWORD: cashmate
+      MYSQL_ROOT_PASSWORD: cashmate-root
+    ports:
+      - "3307:3306"
+    volumes:
+      - cashmate_db_dev:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ucashmate", "-pcashmate"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cashmate-api-dev
+    restart: unless-stopped
+    environment:
+      APP_PORT: 8096
+      APP_ENV: debug
+      APP_TIMEZONE: Asia/Jakarta
+      AUTO_MIGRATE: "true"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: cashmate
+      DB_PASSWORD: cashmate
+      DB_NAME: cashmate_dev
+      JWT_SECRET: local-development-access-secret-change-me-32
+      JWT_REFRESH_SECRET: local-development-refresh-secret-change-me-32
+      CORS_ORIGINS: http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8096:8096"
+
+volumes:
+  cashmate_db_dev:

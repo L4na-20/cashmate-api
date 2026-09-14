@@ -32,8 +32,10 @@ if [ -z "$DOMAIN" ]; then
   exit 1
 fi
 
-echo "==> Menjalankan container db + api + nginx..."
-docker compose up -d db api nginx
+echo "==> Menjalankan container api + nginx..."
+# Production uses the teacher-provided MySQL database; there is intentionally
+# no production `db` service in docker-compose.yml.
+docker compose up -d api nginx
 
 echo "==> Mendapatkan sertifikat Let's Encrypt untuk $DOMAIN ..."
 docker compose run --rm --entrypoint certbot certbot certonly \

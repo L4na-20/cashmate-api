@@ -1,127 +1,118 @@
-# ======================
-#  CASHMATE API - GUIDE
-#  Backend REST API Golang
-# ======================
+# CashMate API
 
-## 🧰 Tech Stack
-- **Go** (Gin Gonic untuk HTTP + routing)
-- **GORM** (ORM untuk MySQL)
-- **MySQL** sebagai database
+REST API CashMate untuk cash management UMKM. API memakai Gin, GORM, MySQL,
+JWT access/refresh token, dan tenant isolation berbasis Business.
 
-## 📁 Struktur Folder
+## Development cepat
 
-```
-API/
-├── go.mod                      # Dependensi Go
-├── .env.example                # Template konfigurasi
-├── main.go                     # Entry point aplikasi
-├── config/
-│   └── database.go             # Load .env + koneksi GORM ke MySQL
-├── models/
-│   ├── category.go             # Model tabel categories
-│   └── transaction.go          # Model tabel transactions (+ relasi ke kategori)
-├── controllers/
-│   ├── category_controller.go  # GET/POST /api/categories
-│   ├── transaction_controller.go
-│   ├── dashboard_controller.go # /api/dashboard/summary
-│   └── report_controller.go    # /api/reports/monthly
-├── middleware/
-│   └── cors.go                 # Middleware CORS
-└── routes/
-    └── routes.go               # Registrasi semua route
-```
-
-## 🚀 Cara Menjalankan
-
-### 1. Prasyarat
-- Go 1.21+ ([download](https://go.dev/dl/))
-- MySQL aktif (XAMPP / Laragon / Docker)
-
-### 2. Persiapan Database
-```sql
-CREATE DATABASE cashmate CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-### 3. Konfigurasi
-```bash
-# dari folder API/
-cp .env.example .env
-```
-
-Lalu sesuaikan isi `.env` (DB_USER, DB_PASSWORD, dst). Tabel `categories` dan
-`transactions` dibuat **otomatis** saat server pertama kali dijalankan (AutoMigrate).
-
-### 4. Install dependensi & jalankan
-```bash
-go mod tidy
-go run main.go
-```
-
-Server berjalan di **http://localhost:8080**. Cek dengan:
+Prasyarat: Docker Compose.
 
 ```bash
-curl http://localhost:8080/api/health
-# => {"status":"ok","service":"cashmate-api"}
+docker compose -f docker-compose.dev.yml up -d --build
+curl http://localhost:8096/api/health
 ```
 
-## 🔌 Daftar Endpoint
+Compose development menjalankan MySQL terisolasi pada port host `3307` dan API
+pada `8096`. Database production tidak pernah dipakai oleh file ini.
 
-| Method | URL                              | Deskripsi                                        |
-|--------|----------------------------------|--------------------------------------------------|
-| GET    | `/api/health`                    | Health check                                     |
-| GET    | `/api/categories`                | List kategori (`?type=income` untuk filter)      |
-| POST   | `/api/categories`                | Tambah kategori                                  |
-| POST   | `/api/transactions`              | Catat Cash In/Out baru                           |
-| GET    | `/api/transactions`              | Histori + filter + pagination                    |
-| GET    | `/api/dashboard/summary`         | Total In, Total Out, Sisa Saldo, transaksi terakhir |
-| GET    | `/api/reports/monthly`           | Rekap pemasukan/pengeluaran per bulan            |
+Untuk menjalankan API di luar Docker:
 
-### Contoh Request
+```bash
+cp .env.development.example .env
+go run .
+```
 
-**POST `/api/categories`**
+`AUTO_MIGRATE=true` hanya untuk database development kosong. Production harus
+menjalankan SQL berurutan di `migrations/` setelah backup dan preflight.
+
+## Model tenant
+
+```text
+Business
+├── Owner + Staff
+├── Wallets
+├── Categories
+└── Transactions
+```
+
+Public `POST /api/auth/register` selalu membuat Business baru, Owner, dan wallet
+`Cash` dalam satu database transaction. Staff hanya dibuat oleh Owner melalui
+`POST /api/staff`.
+
+Role API adalah `OWNER` dan `STAFF`. Semua resource di-scope dari Business yang
+dimuat server melalui JWT user aktif; `business_id` dari client tidak pernah
+dipakai sebagai otorisasi.
+
+## Endpoint MVP
+
+| Method | Endpoint | Akses |
+|---|---|---|
+| POST | `/api/auth/register` | Public Owner registration |
+| POST | `/api/auth/login` | Public |
+| POST | `/api/auth/refresh` | Public |
+| POST | `/api/auth/logout` | Authenticated |
+| GET | `/api/auth/me` | Authenticated |
+| GET/POST/DELETE | `/api/staff[/:id]` | Owner |
+| GET | `/api/wallets[/:id]` | Owner/Staff; Staff tanpa balance |
+| POST/PUT/DELETE | `/api/wallets[/:id]` | Owner |
+| POST | `/api/wallets/:id/restore` | Owner |
+| GET | `/api/categories` | Owner/Staff |
+| POST/PUT/DELETE | `/api/categories[/:id]` | Owner |
+| POST | `/api/categories/:id/restore` | Owner |
+| GET/POST | `/api/transactions` | Owner/Staff create; Staff hanya histori sendiri hari ini |
+| PUT/DELETE | `/api/transactions/:id` | Owner |
+| POST | `/api/transactions/:id/restore` | Owner |
+| GET | `/api/dashboard/summary` | Owner |
+| GET | `/api/reports/monthly?year=2026` | Owner |
+
+Success response memakai:
+
 ```json
-{ "name": "Penjualan", "type": "income" }
+{ "message": "...", "data": {} }
 ```
 
-**POST `/api/transactions`**
-```json
-{
-  "amount": 150000,
-  "type": "income",
-  "category_id": 1,
-  "description": "Penjualan produk A",
-  "date": "2026-09-08"
-}
-```
-> `type` harus cocok dengan `type` kategori. `date` opsional (format `YYYY-MM-DD`).
+List pagination memakai `data` dan `meta`. Error memakai `message` dan optional
+`errors`. Resource tenant lain dikembalikan sebagai `404`; role yang tidak
+berhak dikembalikan sebagai `403`.
 
-**GET `/api/transactions`** — filter & pagination
-```
-/api/transactions
-/api/transactions?from_date=2026-09-01&to_date=2026-09-30
-/api/transactions?category_id=2&type=expense
-/api/transactions?page=2&per_page=20
-```
+## Money, date, dan balance
 
-## 🌐 CORS
-CORS sudah dikonfigurasi di `middleware/cors.go`. Default origin yang diizinkan:
-- `http://localhost:8000` (Laravel)
-- `http://127.0.0.1:8000`
-- `http://localhost:3000`
+- Currency MVP selalu `IDR`.
+- Amount dan wallet balance adalah integer whole rupiah (`int64`/`BIGINT`).
+- Wallet balance hanya berubah melalui create/edit/void/restore transaction.
+- Update balance menggunakan atomic SQL expression di dalam DB transaction.
+- Negative balance dipertahankan untuk MVP.
+- Timezone business default `Asia/Jakarta` melalui `APP_TIMEZONE`.
+- Staff tidak dapat mengirim tanggal; server memakai tanggal hari berjalan.
+- Owner dapat mengirim `date` untuk backdate.
 
-Tambahkan origin frontend lain pada daftar `AllowOrigins` bila perlu.
+## Migration production
 
-## 🧪 Uji Cepat Semua Endpoint
+Jalankan pada backup/clone terlebih dahulu:
+
+1. `migrations/001_create_business_tenancy.sql`
+2. `migrations/002_backfill_legacy_business.sql`
+3. Review orphan, owner count, fractional money, dan balance reconciliation.
+4. Migration 002 membuat adjustment transaction eksplisit jika balance lama berbeda dari ledger; hentikan proses bila preflight menemukan pecahan rupiah.
+5. `migrations/003_convert_money_and_constraints.sql`
+6. Deploy API baru dan lakukan smoke test.
+7. Jalankan `migrations/004_remove_legacy_ownership.sql` setelah validasi.
+
+## Test
+
+Unit/route tests tanpa database:
+
 ```bash
-# Tambah kategori
-curl -X POST http://localhost:8080/api/categories -H "Content-Type: application/json" -d "{\"name\":\"Penjualan\",\"type\":\"income\"}"
-
-# Catat transaksi
-curl -X POST http://localhost:8080/api/transactions -H "Content-Type: application/json" -d "{\"amount\":100000,\"type\":\"income\",\"category_id\":1,\"description\":\"Test\"}"
-
-# Ringkasan dashboard
-curl http://localhost:8080/api/dashboard/summary
-
-# Rekap bulanan
-curl "http://localhost:8080/api/reports/monthly?year=2026"
+GOCACHE=/tmp/cashmate-go-build go test ./...
+GOCACHE=/tmp/cashmate-go-build go vet ./...
 ```
+
+Integration test membutuhkan database dengan nama yang mengandung `_test`:
+
+```bash
+CASHMATE_TEST_DSN='cashmate:cashmate@tcp(127.0.0.1:3307)/cashmate_test?charset=utf8mb4&parseTime=True&loc=Asia%2FJakarta' \
+GOCACHE=/tmp/cashmate-go-build go test ./integration -v
+```
+
+Integration flow menguji dua Business, IDOR, Staff RBAC, Staff daily history,
+Owner visibility, edit/void, dan balance consistency.

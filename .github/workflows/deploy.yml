@@ -18,6 +18,23 @@ jobs:
   ci:
     name: CI - Build & Vet
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: cashmate_test
+          MYSQL_USER: cashmate
+          MYSQL_PASSWORD: cashmate
+          MYSQL_ROOT_PASSWORD: cashmate-root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ucashmate -pcashmate"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      CASHMATE_TEST_DSN: cashmate:cashmate@tcp(127.0.0.1:3306)/cashmate_test?charset=utf8mb4&parseTime=True&loc=Asia%2FJakarta
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,6 +46,7 @@ jobs:
 
       - name: Build & Vet
         run: |
+          go test ./...
           go build ./...
           go vet ./...
 

@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+!.env.development.example
 CashMate_BRD_v3.md
 CashMate_PRD_v1.md
 
