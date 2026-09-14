@@ -6,6 +6,7 @@
 !.env.development.example
 CashMate_BRD_v3.md
 CashMate_PRD_v1.md
+AGENTS.md
 
 # ===== Go build artifacts =====
 cashmate-api
