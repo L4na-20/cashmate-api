@@ -2,76 +2,59 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"cashmate-api/config"
+	"cashmate-api/helpers"
 	"cashmate-api/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-// DashboardSummary mengembalikan ringkasan keuangan user yang login.
+// DashboardSummary is Owner-only (enforced by the route and rechecked here)
+// and aggregates active transactions for the authenticated Business.
 func DashboardSummary(c *gin.Context) {
-	userID := mustUserID(c)
-
-	var walletIDs []uint
-	config.DB.Model(&models.Wallet{}).Where("user_id = ?", userID).Pluck("id", &walletIDs)
-	if len(walletIDs) == 0 {
-		c.JSON(http.StatusOK, gin.H{
-			"total_income":        0,
-			"total_expense":       0,
-			"balance":             0,
-			"transaction_count":   map[string]int64{"income": 0, "expense": 0},
-			"recent_transactions": []models.Transaction{},
-		})
+	if !isOwner(c) {
+		helpers.Error(c, http.StatusForbidden, "dashboard hanya tersedia untuk Owner", nil)
 		return
 	}
+	businessID := currentBusinessID(c)
+	now := time.Now().In(config.BusinessLocation())
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, config.BusinessLocation())
+	nextMonth := monthStart.AddDate(0, 1, 0)
 
-	var incomeAgg, expenseAgg struct {
-		Total float64
+	var totalBalance int64
+	config.DB.Unscoped().Model(&models.Wallet{}).
+		Where("business_id = ?", businessID).
+		Select("COALESCE(SUM(balance), 0)").Scan(&totalBalance)
+
+	var income, expense int64
+	config.DB.Model(&models.Transaction{}).
+		Where("business_id = ? AND type = ? AND date >= ? AND date < ?", businessID, models.TransactionIncome, monthStart, nextMonth).
+		Select("COALESCE(SUM(amount), 0)").Scan(&income)
+	config.DB.Model(&models.Transaction{}).
+		Where("business_id = ? AND type = ? AND date >= ? AND date < ?", businessID, models.TransactionExpense, monthStart, nextMonth).
+		Select("COALESCE(SUM(amount), 0)").Scan(&expense)
+
+	var transactionCount int64
+	config.DB.Model(&models.Transaction{}).Where("business_id = ?", businessID).Count(&transactionCount)
+	var latest []models.Transaction
+	if err := preloadTransaction(config.DB.Model(&models.Transaction{}).
+		Where("business_id = ?", businessID).
+		Order("date DESC, id DESC").Limit(5).Find(&latest)).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal mengambil transaksi terbaru", nil)
+		return
 	}
-	config.DB.Model(&models.Transaction{}).
-		Where("type = ? AND wallet_id IN ?", "income", walletIDs).
-		Select("COALESCE(SUM(amount),0) AS total").Scan(&incomeAgg)
-	config.DB.Model(&models.Transaction{}).
-		Where("type = ? AND wallet_id IN ?", "expense", walletIDs).
-		Select("COALESCE(SUM(amount),0) AS total").Scan(&expenseAgg)
-
-	// Total saldo seluruh wallet milik user.
-	var totalBalance float64
-	config.DB.Model(&models.Wallet{}).
-		Where("user_id = ?", userID).
-		Select("COALESCE(SUM(balance),0)").Scan(&totalBalance)
-
-	var recent []models.Transaction
-	config.DB.Preload("Category").Preload("Wallet").
-		Where("wallet_id IN ?", walletIDs).
-		Order("date DESC, id DESC").Limit(5).Find(&recent)
-
-	c.JSON(http.StatusOK, gin.H{
-		"total_income":       incomeAgg.Total,
-		"total_expense":      expenseAgg.Total,
-		"balance":            totalBalance,
-		"transaction_count": struct {
-			Income  int64 `json:"income"`
-			Expense int64 `json:"expense"`
-		}{
-			incomeCountUser(walletIDs),
-			expenseCountUser(walletIDs),
-		},
-		"recent_transactions": recent,
+	latestViews := make([]gin.H, 0, len(latest))
+	for _, transaction := range latest {
+		latestViews = append(latestViews, transactionView(transaction, true))
+	}
+	helpers.Success(c, http.StatusOK, "dashboard berhasil diambil", gin.H{
+		"total_balance":         totalBalance,
+		"current_month_income":  income,
+		"current_month_expense": expense,
+		"net_cashflow":          income - expense,
+		"transaction_count":     transactionCount,
+		"latest_transactions":   latestViews,
 	})
-}
-
-func incomeCountUser(walletIDs []uint) int64 {
-	var n int64
-	config.DB.Model(&models.Transaction{}).
-		Where("type = ? AND wallet_id IN ?", "income", walletIDs).Count(&n)
-	return n
-}
-
-func expenseCountUser(walletIDs []uint) int64 {
-	var n int64
-	config.DB.Model(&models.Transaction{}).
-		Where("type = ? AND wallet_id IN ?", "expense", walletIDs).Count(&n)
-	return n
 }

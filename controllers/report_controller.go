@@ -1,87 +1,75 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"cashmate-api/config"
+	"cashmate-api/helpers"
 	"cashmate-api/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-// MonthlyReport mengelompokkan income & expense per bulan milik user.
-//
-// Query params:
-//   - year : tahun (default tahun berjalan, gunakan 0 = semua tahun)
+type monthlyAggregate struct {
+	Month  string `gorm:"column:month"`
+	Type   string `gorm:"column:type"`
+	Amount int64  `gorm:"column:total"`
+}
+
 func MonthlyReport(c *gin.Context) {
-	userID := mustUserID(c)
-	year := c.Query("year")
-
-	var walletIDs []uint
-	config.DB.Model(&models.Wallet{}).Where("user_id = ?", userID).Pluck("id", &walletIDs)
-
-	if len(walletIDs) == 0 {
-		c.JSON(http.StatusOK, gin.H{"data": []interface{}{}})
+	if !isOwner(c) {
+		helpers.Error(c, http.StatusForbidden, "laporan hanya tersedia untuk Owner", nil)
 		return
 	}
-
-	query := config.DB.Model(&models.Transaction{}).Where("wallet_id IN ?", walletIDs)
-	if year != "" && year != "0" {
-		query = query.Where("YEAR(date) = ?", year)
+	year := time.Now().In(config.BusinessLocation()).Year()
+	if value := c.Query("year"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 || parsed > 9999 {
+			helpers.Error(c, http.StatusBadRequest, "year harus berupa tahun yang valid", nil)
+			return
+		}
+		year = parsed
 	}
 
-	var rows []struct {
-		Month string  `gorm:"column:month"`
-		Type  string  `gorm:"column:type"`
-		Total float64 `gorm:"column:total"`
+	var rows []monthlyAggregate
+	query := config.DB.Model(&models.Transaction{}).
+		Where("business_id = ? AND YEAR(date) = ?", currentBusinessID(c), year).
+		Select("DATE_FORMAT(date, '%Y-%m') AS month, type, COALESCE(SUM(amount), 0) AS total").
+		Group("DATE_FORMAT(date, '%Y-%m'), type").
+		Order("month ASC")
+	if err := query.Scan(&rows).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal mengambil laporan bulanan", nil)
+		return
 	}
-	query.Select(
-		"DATE_FORMAT(date, '%Y-%m') AS month",
-		"type",
-		"COALESCE(SUM(amount),0) AS total",
-	).
-		Group("month, type").
-		Order("month ASC").
-		Scan(&rows)
-
 	grouped := map[string]*struct {
-		Income  float64 `json:"income"`
-		Expense float64 `json:"expense"`
-		Balance float64 `json:"balance"`
+		Income  int64
+		Expense int64
 	}{}
-
-	for _, r := range rows {
-		if grouped[r.Month] == nil {
-			grouped[r.Month] = &struct {
-				Income  float64 `json:"income"`
-				Expense float64 `json:"expense"`
-				Balance float64 `json:"balance"`
+	for _, row := range rows {
+		if grouped[row.Month] == nil {
+			grouped[row.Month] = &struct {
+				Income  int64
+				Expense int64
 			}{}
 		}
-		if r.Type == "income" {
-			grouped[r.Month].Income = r.Total
-		} else if r.Type == "expense" {
-			grouped[r.Month].Expense = r.Total
+		if row.Type == models.TransactionIncome {
+			grouped[row.Month].Income = row.Amount
+		} else if row.Type == models.TransactionExpense {
+			grouped[row.Month].Expense = row.Amount
 		}
 	}
-
-	type item struct {
-		Month   string  `json:"month"`
-		Income  float64 `json:"income"`
-		Expense float64 `json:"expense"`
-		Balance float64 `json:"balance"`
+	items := make([]gin.H, 0, len(grouped))
+	for month := time.Date(year, 1, 1, 0, 0, 0, 0, config.BusinessLocation()); month.Year() == year; month = month.AddDate(0, 1, 0) {
+		key := fmt.Sprintf("%04d-%02d", month.Year(), month.Month())
+		entry := grouped[key]
+		var income, expense int64
+		if entry != nil {
+			income, expense = entry.Income, entry.Expense
+		}
+		items = append(items, gin.H{"month": key, "income": income, "expense": expense, "net_cashflow": income - expense})
 	}
-
-	items := make([]item, 0, len(grouped))
-	for month, g := range grouped {
-		g.Balance = g.Income - g.Expense
-		items = append(items, item{
-			Month:   month,
-			Income:  g.Income,
-			Expense: g.Expense,
-			Balance: g.Balance,
-		})
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": items})
+	helpers.Success(c, http.StatusOK, "laporan bulanan berhasil diambil", items)
 }

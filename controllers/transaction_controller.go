@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,72 +10,189 @@ import (
 	"cashmate-api/config"
 	"cashmate-api/helpers"
 	"cashmate-api/models"
+	"cashmate-api/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// transactionInput menampung payload create & update transaksi.
 type transactionInput struct {
-	WalletID    uint    `json:"wallet_id" binding:"required"`
-	Amount      float64 `json:"amount" binding:"required,gt=0"`
-	Type        string  `json:"type" binding:"required,oneof=income expense"`
-	CategoryID  uint    `json:"category_id" binding:"required"`
-	Description string  `json:"description"`
-	Date        string  `json:"date"` // YYYY-MM-DD
+	WalletID    uint   `json:"wallet_id"`
+	Amount      int64  `json:"amount"`
+	Type        string `json:"type"`
+	CategoryID  uint   `json:"category_id"`
+	Description string `json:"description"`
+	Date        string `json:"date"`
 }
 
-// TransactionsIndex menampilkan histori transaksi milik user yang login
-// (difilter melalui wallet milik user).
+type transactionMeta struct {
+	CurrentPage int   `json:"current_page"`
+	PerPage     int   `json:"per_page"`
+	Total       int64 `json:"total"`
+	LastPage    int   `json:"last_page"`
+	From        int64 `json:"from"`
+	To          int64 `json:"to"`
+}
+
+func transactionView(transaction models.Transaction, revealBalance bool) gin.H {
+	result := gin.H{
+		"id":                 transaction.ID,
+		"business_id":        transaction.BusinessID,
+		"wallet_id":          transaction.WalletID,
+		"category_id":        transaction.CategoryID,
+		"created_by_user_id": transaction.CreatedByUserID,
+		"amount":             transaction.Amount,
+		"type":               transaction.Type,
+		"description":        transaction.Description,
+		"date":               transaction.Date.Format("2006-01-02"),
+		"created_at":         transaction.CreatedAt,
+		"updated_at":         transaction.UpdatedAt,
+		"updated_by_user_id": transaction.UpdatedByUserID,
+		"deleted_by_user_id": transaction.DeletedByUserID,
+	}
+	if transaction.DeletedAt.Valid {
+		result["deleted_at"] = transaction.DeletedAt.Time
+	} else {
+		result["deleted_at"] = nil
+	}
+	if transaction.Wallet != nil {
+		wallet := gin.H{
+			"id":          transaction.Wallet.ID,
+			"business_id": transaction.Wallet.BusinessID,
+			"name":        transaction.Wallet.Name,
+			"currency":    transaction.Wallet.Currency,
+		}
+		if revealBalance {
+			wallet["balance"] = transaction.Wallet.Balance
+		}
+		result["wallet"] = wallet
+	}
+	if transaction.Category != nil {
+		result["category"] = gin.H{
+			"id":          transaction.Category.ID,
+			"business_id": transaction.Category.BusinessID,
+			"name":        transaction.Category.Name,
+			"type":        transaction.Category.Type,
+		}
+	}
+	if transaction.CreatedBy != nil {
+		result["created_by"] = gin.H{
+			"id":   transaction.CreatedBy.ID,
+			"name": transaction.CreatedBy.Name,
+			"role": models.NormalizeRole(transaction.CreatedBy.Role),
+		}
+	}
+	return result
+}
+
+func preloadTransaction(query *gorm.DB) *gorm.DB {
+	return query.
+		Preload("Wallet", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Category", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("CreatedBy", func(db *gorm.DB) *gorm.DB { return db.Unscoped() })
+}
+
+func parseDate(value string) (time.Time, error) {
+	return time.ParseInLocation("2006-01-02", value, config.BusinessLocation())
+}
+
+func todayDate() time.Time {
+	now := time.Now().In(config.BusinessLocation())
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, config.BusinessLocation())
+}
+
+func validateTransactionInput(input *transactionInput) string {
+	input.Type = strings.ToLower(strings.TrimSpace(input.Type))
+	input.Description = helpers.Sanitize(input.Description)
+	if input.WalletID == 0 || input.CategoryID == 0 || input.Amount <= 0 {
+		return "wallet_id, category_id, dan amount (> 0) wajib diisi"
+	}
+	if input.Type != models.TransactionIncome && input.Type != models.TransactionExpense {
+		return "type harus income atau expense"
+	}
+	return ""
+}
+
+func transactionDate(inputDate string, fallback time.Time) (time.Time, error) {
+	if inputDate == "" {
+		return fallback, nil
+	}
+	return parseDate(inputDate)
+}
+
 func TransactionsIndex(c *gin.Context) {
-	userID := mustUserID(c)
-	// Kumpulan wallet id milik user (dipakai untuk filter transaksi).
-	var walletIDs []uint
-	config.DB.Model(&models.Wallet{}).Where("user_id = ?", userID).Pluck("id", &walletIDs)
-	if len(walletIDs) == 0 {
-		c.JSON(http.StatusOK, gin.H{"data": []models.Transaction{}, "total": 0})
-		return
+	businessID := currentBusinessID(c)
+	owner := isOwner(c)
+	status := parseResourceStatus(c)
+	if !owner {
+		status = "active"
+	}
+	query := config.DB.Model(&models.Transaction{}).Where("business_id = ?", businessID)
+	if owner && status != "active" {
+		query = query.Unscoped()
+	}
+	if status == "disabled" {
+		query = query.Where("deleted_at IS NOT NULL")
+	} else if status == "active" {
+		query = query.Where("deleted_at IS NULL")
+	}
+	if !owner {
+		query = query.Where("created_by_user_id = ? AND date = ?", currentUserID(c), todayDate().Format("2006-01-02"))
 	}
 
-	buildFiltered := func() *gorm.DB {
-		q := config.DB.Model(&models.Transaction{}).
-			Where("wallet_id IN ?", walletIDs)
-		if v := c.Query("wallet_id"); v != "" {
-			if wid, err := strconv.ParseUint(v, 10, 64); err == nil && isWalletOwner(c, uint(wid)) {
-				q = q.Where("wallet_id = ?", wid)
-			} else {
-				// Jika wallet_id tidak milik user, kembalikan tanpa hasil.
-				q = q.Where("1 = 0")
+	if value := c.Query("wallet_id"); value != "" {
+		id, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || id == 0 {
+			helpers.Error(c, http.StatusBadRequest, "wallet_id filter tidak valid", nil)
+			return
+		}
+		query = query.Where("wallet_id = ?", id)
+	}
+	if value := c.Query("category_id"); value != "" {
+		id, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || id == 0 {
+			helpers.Error(c, http.StatusBadRequest, "category_id filter tidak valid", nil)
+			return
+		}
+		query = query.Where("category_id = ?", id)
+	}
+	if value := strings.ToLower(strings.TrimSpace(c.Query("type"))); value != "" {
+		if value != models.TransactionIncome && value != models.TransactionExpense {
+			helpers.Error(c, http.StatusBadRequest, "type filter tidak valid", nil)
+			return
+		}
+		query = query.Where("type = ?", value)
+	}
+	if owner {
+		if value := c.Query("creator_id"); value != "" {
+			id, err := strconv.ParseUint(value, 10, 64)
+			if err != nil || id == 0 {
+				helpers.Error(c, http.StatusBadRequest, "creator_id filter tidak valid", nil)
+				return
 			}
+			query = query.Where("created_by_user_id = ?", id)
 		}
-		if v := c.Query("from_date"); v != "" {
-			q = q.Where("date >= ?", v)
-		}
-		if v := c.Query("to_date"); v != "" {
-			q = q.Where("date <= ?", v)
-		}
-		if v := c.Query("category_id"); v != "" {
-			if cid, err := strconv.ParseUint(v, 10, 64); err == nil && isCategoryOwner(c, uint(cid)) {
-				q = q.Where("category_id = ?", cid)
-			} else {
-				q = q.Where("1 = 0")
+		if value := c.Query("from_date"); value != "" {
+			if _, err := parseDate(value); err != nil {
+				helpers.Error(c, http.StatusBadRequest, "from_date harus YYYY-MM-DD", nil)
+				return
 			}
+			query = query.Where("date >= ?", value)
 		}
-		if v := c.Query("type"); v != "" {
-			v = strings.ToLower(v)
-			if v == "income" || v == "expense" {
-				q = q.Where("type = ?", v)
+		if value := c.Query("to_date"); value != "" {
+			if _, err := parseDate(value); err != nil {
+				helpers.Error(c, http.StatusBadRequest, "to_date harus YYYY-MM-DD", nil)
+				return
 			}
+			query = query.Where("date <= ?", value)
 		}
-		return q
 	}
 
 	var total int64
-	if err := buildFiltered().Count(&total).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := query.Count(&total).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal menghitung transaksi", nil)
 		return
 	}
-
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "15"))
 	if page < 1 {
@@ -83,277 +201,230 @@ func TransactionsIndex(c *gin.Context) {
 	if perPage < 1 || perPage > 100 {
 		perPage = 15
 	}
-
 	var transactions []models.Transaction
-	if err := buildFiltered().
-		Preload("Category").
-		Preload("Wallet").
-		Order("date DESC, id DESC").
-		Offset((page - 1) * perPage).
-		Limit(perPage).
-		Find(&transactions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := preloadTransaction(query.Order("date DESC, id DESC").Offset((page - 1) * perPage).Limit(perPage)).Find(&transactions).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal mengambil transaksi", nil)
 		return
 	}
-
-	from := (page-1)*perPage + 1
-	to := page * perPage
-	if total == 0 {
-		from, to = 0, 0
-	} else if int64(to) > total {
-		to = int(total)
+	views := make([]gin.H, 0, len(transactions))
+	for _, transaction := range transactions {
+		views = append(views, transactionView(transaction, owner))
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"data":         transactions,
-		"total":        total,
-		"from":         int64(from),
-		"to":           int64(to),
-		"per_page":     perPage,
-		"current_page": page,
-		"last_page":    (int(total) + perPage - 1) / perPage,
+	lastPage := 0
+	if total > 0 {
+		lastPage = int((total + int64(perPage) - 1) / int64(perPage))
+	}
+	from, to := int64(0), int64(0)
+	if total > 0 {
+		from = int64((page-1)*perPage + 1)
+		to = int64(page * perPage)
+		if to > total {
+			to = total
+		}
+	}
+	helpers.SuccessWithMeta(c, http.StatusOK, "transaksi berhasil diambil", views, transactionMeta{
+		CurrentPage: page, PerPage: perPage, Total: total, LastPage: lastPage, From: from, To: to,
 	})
 }
 
-// validateTransaction memvalidasi input & memastikan wallet & kategori
-// yang direferensikan adalah milik user yang login.
-func validateTransaction(c *gin.Context, input *transactionInput) (models.Transaction, string) {
-	input.Type = strings.ToLower(strings.TrimSpace(input.Type))
-	if input.Type != "income" && input.Type != "expense" {
-		return models.Transaction{}, "tipe harus 'income' atau 'expense'"
-	}
-	if input.Amount <= 0 {
-		return models.Transaction{}, "nominal harus lebih besar dari 0"
-	}
-
-	// Pastikan wallet milik user yang login (anti-IDOR).
-	if !isWalletOwner(c, input.WalletID) {
-		return models.Transaction{}, "wallet tidak ditemukan"
-	}
-
-	// Pastikan kategori (global atau milik user) dapat diakses.
-	if !isCategoryOwner(c, input.CategoryID) {
-		return models.Transaction{}, "kategori tidak ditemukan"
-	}
-
-	var category models.Category
-	config.DB.First(&category, input.CategoryID)
-	if category.ID == 0 {
-		return models.Transaction{}, "kategori tidak ditemukan"
-	}
-	if category.Type != input.Type {
-		return models.Transaction{}, "tipe transaksi tidak cocok dengan tipe kategori"
-	}
-
-	txDate := time.Now()
-	if input.Date != "" {
-		parsed, err := time.Parse("2006-01-02", input.Date)
-		if err != nil {
-			return models.Transaction{}, "format tanggal harus YYYY-MM-DD"
-		}
-		txDate = parsed
-	}
-
-	return models.Transaction{
-		WalletID:    input.WalletID,
-		Amount:      input.Amount,
-		Type:        input.Type,
-		CategoryID:  input.CategoryID,
-		Description: helpers.Sanitize(input.Description),
-		Date:        txDate,
-	}, ""
-}
-
-// TransactionsStore mencatat transaksi baru & memperbarui saldo wallet.
 func TransactionsStore(c *gin.Context) {
 	var input transactionInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "parameter tidak lengkap: wallet_id, amount, type, category_id wajib diisi"})
+		helpers.Error(c, http.StatusBadRequest, "payload transaksi tidak valid", nil)
 		return
 	}
-
-	transaction, msg := validateTransaction(c, &input)
-	if msg != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+	if msg := validateTransactionInput(&input); msg != "" {
+		helpers.Error(c, http.StatusBadRequest, msg, nil)
 		return
 	}
-
-	// Simpan transaksi dalam transaksi DB agar konsisten dengan saldo.
-	err := config.DB.Transaction(func(tx *gorm.DB) error {
+	if !isOwner(c) && input.Date != "" {
+		helpers.Error(c, http.StatusForbidden, "Staff tidak dapat menentukan tanggal transaksi", nil)
+		return
+	}
+	date, err := transactionDate(input.Date, todayDate())
+	if err != nil {
+		helpers.Error(c, http.StatusBadRequest, "date harus YYYY-MM-DD", nil)
+		return
+	}
+	transaction := models.Transaction{
+		BusinessID:      currentBusinessID(c),
+		WalletID:        input.WalletID,
+		CategoryID:      input.CategoryID,
+		CreatedByUserID: currentUserID(c),
+		Amount:          input.Amount,
+		Type:            input.Type,
+		Description:     input.Description,
+		Date:            date,
+	}
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		if _, _, err := services.ValidateReferences(tx, transaction.BusinessID, transaction.WalletID, transaction.CategoryID, transaction.Type); err != nil {
+			return err
+		}
 		if err := tx.Create(&transaction).Error; err != nil {
 			return err
 		}
-		var wallet models.Wallet
-		if err := tx.Where("id = ? AND user_id = ?", transaction.WalletID, mustUserID(c)).
-			First(&wallet).Error; err != nil {
-			return err
-		}
-		delta := transaction.Amount
-		if transaction.Type == "expense" {
-			delta = -delta
-		}
-		return tx.Model(&wallet).Update("balance", wallet.Balance+delta).Error
+		return services.ApplyWalletDelta(tx, transaction.BusinessID, transaction.WalletID, services.Delta(transaction), false)
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if errors.Is(err, services.ErrResourceUnavailable) {
+		helpers.Error(c, http.StatusUnprocessableEntity, "wallet atau kategori tidak tersedia untuk transaksi", nil)
 		return
 	}
-
-	config.DB.Preload("Category").Preload("Wallet").First(&transaction, transaction.ID)
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "transaksi berhasil disimpan",
-		"data":    transaction,
-	})
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal menyimpan transaksi", nil)
+		return
+	}
+	transaction = loadTransaction(transaction.ID)
+	helpers.Success(c, http.StatusCreated, "transaksi berhasil disimpan", transactionView(transaction, isOwner(c)))
 }
 
-// TransactionsUpdate mengubah transaksi milik user (anti-IDOR).
+func loadTransaction(id uint) models.Transaction {
+	var transaction models.Transaction
+	preloadTransaction(config.DB).First(&transaction, id)
+	return transaction
+}
+
 func TransactionsUpdate(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id transaksi tidak valid"})
+		helpers.Error(c, http.StatusBadRequest, "id transaksi tidak valid", nil)
 		return
 	}
-
-	userID := mustUserID(c)
-	// Temukan wallet milik user yang dipakai transaksi ini.
-	var existing models.Transaction
-	if err := config.DB.First(&existing, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
-		return
-	}
-	if !isWalletOwner(c, existing.WalletID) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
-		return
-	}
-
 	var input transactionInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "parameter tidak lengkap: wallet_id, amount, type, category_id wajib diisi"})
+		helpers.Error(c, http.StatusBadRequest, "payload transaksi tidak valid", nil)
 		return
 	}
-
-	transaction, msg := validateTransaction(c, &input)
-	if msg != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+	if msg := validateTransactionInput(&input); msg != "" {
+		helpers.Error(c, http.StatusBadRequest, msg, nil)
 		return
 	}
-
-	transaction.ID = existing.ID
-	transaction.CreatedAt = existing.CreatedAt
-
-	// Kembalikan saldo lama terlebih dahulu, lalu terapkan yang baru.
+	var updated models.Transaction
 	err = config.DB.Transaction(func(tx *gorm.DB) error {
-		oldDelta := existing.Amount
-		if existing.Type == "expense" {
-			oldDelta = -oldDelta
+		var existing models.Transaction
+		if err := tx.Where("id = ? AND business_id = ?", id, currentBusinessID(c)).First(&existing).Error; err != nil {
+			return services.ErrTransactionNotFound
 		}
-		if err := tx.Model(&models.Wallet{}).
-			Where("id = ? AND user_id = ?", existing.WalletID, userID).
-			Update("balance", gorm.Expr("balance - ?", oldDelta)).Error; err != nil {
+		date, err := transactionDate(input.Date, existing.Date)
+		if err != nil {
 			return err
 		}
-
-		if err := tx.Save(&transaction).Error; err != nil {
+		if _, _, err := services.ValidateReferences(tx, existing.BusinessID, input.WalletID, input.CategoryID, input.Type); err != nil {
 			return err
 		}
-
-		newDelta := transaction.Amount
-		if transaction.Type == "expense" {
-			newDelta = -newDelta
+		if err := services.ApplyWalletDelta(tx, existing.BusinessID, existing.WalletID, -services.Delta(existing), true); err != nil {
+			return err
 		}
-		return tx.Model(&models.Wallet{}).
-			Where("id = ? AND user_id = ?", transaction.WalletID, userID).
-			Update("balance", gorm.Expr("balance + ?", newDelta)).Error
+		userID := currentUserID(c)
+		updates := map[string]any{
+			"wallet_id":          input.WalletID,
+			"category_id":        input.CategoryID,
+			"amount":             input.Amount,
+			"type":               input.Type,
+			"description":        input.Description,
+			"date":               date,
+			"updated_by_user_id": userID,
+		}
+		if err := tx.Model(&existing).Updates(updates).Error; err != nil {
+			return err
+		}
+		if err := services.ApplyWalletDelta(tx, existing.BusinessID, input.WalletID, services.Delta(models.Transaction{Amount: input.Amount, Type: input.Type}), false); err != nil {
+			return err
+		}
+		updated = existing
+		updated.WalletID, updated.CategoryID, updated.Amount, updated.Type = input.WalletID, input.CategoryID, input.Amount, input.Type
+		updated.Description, updated.Date, updated.UpdatedByUserID = input.Description, date, &userID
+		return nil
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if errors.Is(err, services.ErrTransactionNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
+		helpers.Error(c, http.StatusNotFound, "transaksi tidak ditemukan", nil)
 		return
 	}
-
-	config.DB.Preload("Category").Preload("Wallet").First(&transaction, transaction.ID)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "transaksi berhasil diperbarui",
-		"data":    transaction,
-	})
+	if errors.Is(err, services.ErrResourceUnavailable) {
+		helpers.Error(c, http.StatusUnprocessableEntity, "wallet atau kategori tidak tersedia untuk transaksi", nil)
+		return
+	}
+	if _, ok := err.(*time.ParseError); ok {
+		helpers.Error(c, http.StatusBadRequest, "date harus YYYY-MM-DD", nil)
+		return
+	}
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal memperbarui transaksi", nil)
+		return
+	}
+	updated = loadTransaction(updated.ID)
+	helpers.Success(c, http.StatusOK, "transaksi berhasil diperbarui", transactionView(updated, true))
 }
 
-// TransactionsDestroy menghapus transaksi milik user & balik saldo.
 func TransactionsDestroy(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id transaksi tidak valid"})
+		helpers.Error(c, http.StatusBadRequest, "id transaksi tidak valid", nil)
 		return
 	}
-
-	userID := mustUserID(c)
-	var transaction models.Transaction
-	if err := config.DB.First(&transaction, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
-		return
-	}
-	if !isWalletOwner(c, transaction.WalletID) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
-		return
-	}
-
 	err = config.DB.Transaction(func(tx *gorm.DB) error {
-		delta := transaction.Amount
-		if transaction.Type == "expense" {
-			delta = -delta
+		var transaction models.Transaction
+		if err := tx.Where("id = ? AND business_id = ?", id, currentBusinessID(c)).First(&transaction).Error; err != nil {
+			return services.ErrTransactionNotFound
 		}
-		if err := tx.Model(&models.Wallet{}).
-			Where("id = ? AND user_id = ?", transaction.WalletID, userID).
-			Update("balance", gorm.Expr("balance - ?", delta)).Error; err != nil {
+		if err := services.ApplyWalletDelta(tx, transaction.BusinessID, transaction.WalletID, -services.Delta(transaction), true); err != nil {
+			return err
+		}
+		if err := tx.Model(&transaction).UpdateColumn("deleted_by_user_id", currentUserID(c)).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&transaction).Error
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if errors.Is(err, services.ErrTransactionNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
+		helpers.Error(c, http.StatusNotFound, "transaksi tidak ditemukan", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "transaksi berhasil dihapus"})
+	if errors.Is(err, services.ErrResourceUnavailable) {
+		helpers.Error(c, http.StatusUnprocessableEntity, "wallet transaksi tidak tersedia", nil)
+		return
+	}
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal melakukan void transaksi", nil)
+		return
+	}
+	helpers.Success(c, http.StatusOK, "transaksi berhasil di-void", nil)
 }
 
-// TransactionsRestore memulihkan transaksi yang sudah di-soft delete dan
-// mengembalikan efeknya ke saldo wallet (agar laporan & saldo konsisten).
 func TransactionsRestore(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id transaksi tidak valid"})
+		helpers.Error(c, http.StatusBadRequest, "id transaksi tidak valid", nil)
 		return
 	}
-
-	userID := mustUserID(c)
-	var transaction models.Transaction
-	if err := config.DB.Unscoped().First(&transaction, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
-		return
-	}
-	if !isWalletOwner(c, transaction.WalletID) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
-		return
-	}
-
+	var restored models.Transaction
 	err = config.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Unscoped().Model(&transaction).Update("deleted_at", nil).Error; err != nil {
+		if err := tx.Unscoped().Where("id = ? AND business_id = ?", id, currentBusinessID(c)).First(&restored).Error; err != nil {
+			return services.ErrTransactionNotFound
+		}
+		if !restored.DeletedAt.Valid {
+			return services.ErrTransactionNotFound
+		}
+		if err := services.ApplyWalletDelta(tx, restored.BusinessID, restored.WalletID, services.Delta(restored), true); err != nil {
 			return err
 		}
-		delta := transaction.Amount
-		if transaction.Type == "expense" {
-			delta = -delta
-		}
-		return tx.Model(&models.Wallet{}).
-			Where("id = ? AND user_id = ?", transaction.WalletID, userID).
-			Update("balance", gorm.Expr("balance + ?", delta)).Error
+		userID := currentUserID(c)
+		return tx.Unscoped().Model(&restored).Updates(map[string]any{
+			"deleted_at":         nil,
+			"deleted_by_user_id": nil,
+			"updated_by_user_id": userID,
+		}).Error
 	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if errors.Is(err, services.ErrTransactionNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
+		helpers.Error(c, http.StatusNotFound, "transaksi tidak ditemukan atau sudah aktif", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "transaksi berhasil dipulihkan"})
+	if errors.Is(err, services.ErrResourceUnavailable) {
+		helpers.Error(c, http.StatusUnprocessableEntity, "wallet transaksi tidak tersedia", nil)
+		return
+	}
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal memulihkan transaksi", nil)
+		return
+	}
+	restored = loadTransaction(restored.ID)
+	helpers.Success(c, http.StatusOK, "transaksi berhasil dipulihkan", transactionView(restored, true))
 }

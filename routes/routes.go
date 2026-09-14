@@ -1,13 +1,14 @@
 package routes
 
 import (
+	"net/http"
+
 	"cashmate-api/controllers"
 	"cashmate-api/middleware"
-
 	"github.com/gin-gonic/gin"
 )
 
-// Setup mendaftarkan seluruh route REST API dengan prefix /api.
+// Setup registers all REST endpoints under /api.
 func Setup(r *gin.Engine) {
 	r.Use(middleware.SecurityHeaders())
 
@@ -16,62 +17,54 @@ func Setup(r *gin.Engine) {
 	api.Use(middleware.RateLimitGeneral())
 
 	api.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "service": "cashmate-api"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "cashmate-api"})
 	})
 
-	// ---------- Auth (public, dengan rate limiter ketat) ----------
 	auth := api.Group("/auth")
 	auth.Use(middleware.RateLimitAuth())
-	{
-		auth.POST("/register", controllers.AuthRegister)
-		auth.POST("/login", controllers.AuthLogin)
-		auth.POST("/refresh", controllers.AuthRefresh)
-		auth.POST("/logout", middleware.AuthJWT(), controllers.AuthLogout)
-	}
+	auth.POST("/register", controllers.AuthRegister)
+	auth.POST("/login", controllers.AuthLogin)
+	auth.POST("/refresh", controllers.AuthRefresh)
 
-	// ---------- Protected routes (autentikasi wajib) ----------
 	protected := api.Group("")
 	protected.Use(middleware.AuthJWT())
-	{
-		// ==== Bisa diakses SEMUA role (staff & owner) ====
+	protected.POST("/auth/logout", controllers.AuthLogout)
+	protected.GET("/auth/me", controllers.AuthMe)
 
-		// Wallets: lihat
-		protected.GET("/wallets", controllers.WalletsIndex)
-		protected.GET("/wallets/:id", controllers.WalletsShow)
+	// Owner and Staff may read active Business wallets/categories and create
+	// transactions. Controllers still apply role-safe response filtering.
+	protected.GET("/wallets", controllers.WalletsIndex)
+	protected.GET("/wallets/:id", controllers.WalletsShow)
+	protected.GET("/categories", controllers.CategoriesIndex)
+	protected.GET("/transactions", controllers.TransactionsIndex)
+	protected.POST("/transactions", controllers.TransactionsStore)
 
-		// Categories: lihat
-		protected.GET("/categories", controllers.CategoriesIndex)
-
-		// Transactions: kelola pencatatan
-		protected.GET("/transactions", controllers.TransactionsIndex)
-		protected.POST("/transactions", controllers.TransactionsStore)
-		protected.PUT("/transactions/:id", controllers.TransactionsUpdate)
-		protected.DELETE("/transactions/:id", controllers.TransactionsDestroy)
-		protected.POST("/transactions/:id/restore", controllers.TransactionsRestore)
-
-		// Dashboard
-		protected.GET("/dashboard/summary", controllers.DashboardSummary)
-	}
-
-	// ---------- Khusus owner ----------
 	owner := protected.Group("")
 	owner.Use(middleware.RoleOwner())
-	{
-		// Wallets: kelola (tambah/ubah/hapus/pulihkan)
-		owner.POST("/wallets", controllers.WalletsStore)
-		owner.PUT("/wallets/:id", controllers.WalletsUpdate)
-		owner.DELETE("/wallets/:id", controllers.WalletsDestroy)
-		owner.POST("/wallets/:id/restore", controllers.WalletsRestore)
+	owner.GET("/dashboard/summary", controllers.DashboardSummary)
+	owner.GET("/reports/monthly", controllers.MonthlyReport)
 
-		// Categories: kelola
-		owner.POST("/categories", controllers.CategoriesStore)
-		owner.PUT("/categories/:id", controllers.CategoriesUpdate)
-		owner.DELETE("/categories/:id", controllers.CategoriesDestroy)
-		owner.POST("/categories/:id/restore", controllers.CategoriesRestore)
+	owner.POST("/staff", controllers.StaffStore)
+	owner.GET("/staff", controllers.StaffIndex)
+	owner.DELETE("/staff/:id", controllers.StaffDestroy)
 
-		// Laporan & manajemen user
-		owner.GET("/reports/monthly", controllers.MonthlyReport)
-		owner.GET("/auth/users", controllers.AuthUsers)
-		owner.DELETE("/auth/users/:id", controllers.AuthDeleteUser)
-	}
+	owner.POST("/wallets", controllers.WalletsStore)
+	owner.PUT("/wallets/:id", controllers.WalletsUpdate)
+	owner.DELETE("/wallets/:id", controllers.WalletsDestroy)
+	owner.POST("/wallets/:id/restore", controllers.WalletsRestore)
+
+	owner.POST("/categories", controllers.CategoriesStore)
+	owner.PUT("/categories/:id", controllers.CategoriesUpdate)
+	owner.DELETE("/categories/:id", controllers.CategoriesDestroy)
+	owner.POST("/categories/:id/restore", controllers.CategoriesRestore)
+
+	owner.PUT("/transactions/:id", controllers.TransactionsUpdate)
+	owner.DELETE("/transactions/:id", controllers.TransactionsDestroy)
+	owner.POST("/transactions/:id/restore", controllers.TransactionsRestore)
+
+	// Temporary compatibility aliases for clients using the old names. They
+	// remain Owner-only and tenant-scoped.
+	owner.GET("/auth/users", controllers.AuthUsers)
+	owner.DELETE("/auth/users/:id", controllers.AuthDeleteUser)
+
 }

@@ -5,7 +5,7 @@
 # Yang dilakukan:
 #   1. Git pull source code terbaru (branch main)
 #   2. Memastikan file .env ada (tidak pernah di-commit)
-#   3. docker compose up -d --build
+#   3. docker compose -f docker-compose.yml up -d --build
 #   4. Health check API
 #
 # Variabel yang dibutuhkan (dikirim oleh GitHub Actions):
@@ -50,7 +50,10 @@ if [ ! -f .env ]; then
 fi
 
 echo "==> [3/4] Build image & jalankan container..."
-docker compose up -d --build
+# Production deliberately uses the database outside Docker. Keep this file
+# explicit so a local COMPOSE_FILE or docker-compose.dev.yml cannot pull MySQL
+# onto the VPS by accident.
+docker compose -f docker-compose.yml up -d --build
 
 echo "==> [4/4] Health check..."
 for i in $(seq 1 30); do
@@ -63,5 +66,5 @@ for i in $(seq 1 30); do
 done
 
 echo "ERROR: API tidak merespons setelah ~60 detik. Log terakhir:"
-docker compose logs --tail=50 api
+docker compose -f docker-compose.yml logs --tail=50 api
 exit 1
