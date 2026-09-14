@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"sync"
 
+	"cashmate-api/helpers"
+
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 )
@@ -42,9 +44,7 @@ func RateLimitAuth() gin.HandlerFunc {
 	limiter := newIPLimiter(10, 5)
 	return func(c *gin.Context) {
 		if !limiter.get(c.ClientIP()).Allow() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"error": "terlalu banyak percobaan. Silakan coba lagi nanti.",
-			})
+			helpers.Error(c, http.StatusTooManyRequests, "terlalu banyak percobaan. Silakan coba lagi nanti.", nil)
 			return
 		}
 		c.Next()
@@ -57,9 +57,7 @@ func RateLimitGeneral() gin.HandlerFunc {
 	limiter := newIPLimiter(30, 20)
 	return func(c *gin.Context) {
 		if !limiter.get(c.ClientIP()).Allow() {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"error": "terlalu banyak permintaan. Silakan coba lagi nanti.",
-			})
+			helpers.Error(c, http.StatusTooManyRequests, "terlalu banyak permintaan. Silakan coba lagi nanti.", nil)
 			return
 		}
 		c.Next()

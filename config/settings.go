@@ -2,6 +2,7 @@ package config
 
 import (
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -25,6 +26,16 @@ func AllowedOrigins() []string {
 		}
 	}
 	return origins
+}
+
+// BusinessLocation returns the configured business timezone and falls back to
+// Asia/Jakarta when an invalid value is supplied.
+func BusinessLocation() *time.Location {
+	location, err := time.LoadLocation(AppTimezone())
+	if err != nil {
+		return time.FixedZone("Asia/Jakarta", 7*60*60)
+	}
+	return location
 }
 
 // TrustedProxies mengembalikan daftar proxy yang dipercaya (misal IP nginx)

@@ -1,14 +1,13 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
-	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"cashmate-api/config"
 	"cashmate-api/helpers"
+	"cashmate-api/middleware"
 	"cashmate-api/models"
 
 	"github.com/gin-gonic/gin"
@@ -16,66 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// ---------- Token Blacklist (in-memory) ----------
-// Untuk menyederhanakan, invalidasi token dilakukan lewat blacklist
-// in-memory. Pada produksi besar, ganti dengan Redis/database.
-var (
-	blacklistMu sync.Mutex
-	blacklist   = map[string]time.Time{} // token -> expiry
-)
-
-func blacklistToken(token string, expiry time.Time) {
-	blacklistMu.Lock()
-	defer blacklistMu.Unlock()
-	blacklist[token] = expiry
-}
-
-func isBlacklisted(token string) bool {
-	blacklistMu.Lock()
-	defer blacklistMu.Unlock()
-	exp, ok := blacklist[token]
-	if !ok {
-		return false
-	}
-	if time.Now().After(exp) {
-		delete(blacklist, token)
-		return false
-	}
-	return true
-}
-
-// refreshStore menyimpan refresh token yang sedang aktif per user
-// agar bisa di-revoke pada saat logout.
-var (
-	refreshMu sync.Mutex
-	refreshDB = map[uint]string{} // user_id -> refresh token
-)
-
-func storeRefreshToken(userID uint, token string) {
-	refreshMu.Lock()
-	defer refreshMu.Unlock()
-	refreshDB[userID] = token
-}
-
-func getRefreshToken(userID uint) (string, bool) {
-	refreshMu.Lock()
-	defer refreshMu.Unlock()
-	t, ok := refreshDB[userID]
-	return t, ok
-}
-
-func deleteRefreshToken(userID uint) {
-	refreshMu.Lock()
-	defer refreshMu.Unlock()
-	delete(refreshDB, userID)
-}
-
-// ---------- Input structs ----------
-
 type registerInput struct {
-	Name     string `json:"name" binding:"required,min=3"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	BusinessName string `json:"business_name"`
+	Name         string `json:"name"`
+	OwnerName    string `json:"owner_name"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
 }
 
 type loginInput struct {
@@ -87,271 +32,205 @@ type refreshInput struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
-type logoutInput struct {
-	RefreshToken string `json:"refresh_token" binding:"required"`
+func userView(user *models.User) gin.H {
+	return gin.H{
+		"id":          user.ID,
+		"business_id": user.BusinessID,
+		"name":        user.Name,
+		"email":       user.Email,
+		"role":        models.NormalizeRole(user.Role),
+		"created_at":  user.CreatedAt,
+		"updated_at":  user.UpdatedAt,
+	}
 }
 
-// Register membuat akun baru dengan password ter-hash (Bcrypt cost 10).
+func businessView(business *models.Business) gin.H {
+	return gin.H{"id": business.ID, "name": business.Name}
+}
+
+func issueTokens(user *models.User) (string, string, error) {
+	role := models.NormalizeRole(user.Role)
+	access, err := helpers.GenerateAccessToken(user.ID, user.BusinessID, user.Email, role, user.AuthVersion)
+	if err != nil {
+		return "", "", err
+	}
+	refresh, err := helpers.GenerateRefreshToken(user.ID, user.BusinessID, user.Email, role, user.AuthVersion)
+	if err != nil {
+		return "", "", err
+	}
+	return access, refresh, nil
+}
+
+// AuthRegister creates a new tenant, its Owner, and the default Cash wallet
+// atomically. Public registration can never create a Staff account.
 func AuthRegister(c *gin.Context) {
 	var input registerInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid: name (min 3), email, password (min 8)"})
+		helpers.Error(c, http.StatusBadRequest, "data registrasi tidak valid", nil)
 		return
 	}
 
-	email := strings.ToLower(strings.TrimSpace(helpers.Sanitize(input.Email)))
+	input.BusinessName = helpers.Sanitize(input.BusinessName)
 	input.Name = helpers.Sanitize(input.Name)
-
-	// Pengecekan email tetap menimbang user yang sudah di-soft delete,
-	// agar alamat email tidak bisa didaftarkan dua kali.
-	var count int64
-	config.DB.Unscoped().Model(&models.User{}).Where("email = ?", email).Count(&count)
-	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "email sudah terdaftar"})
+	if input.Name == "" {
+		input.Name = helpers.Sanitize(input.OwnerName)
+	}
+	input.Email = strings.ToLower(strings.TrimSpace(helpers.Sanitize(input.Email)))
+	if len(input.BusinessName) < 2 || len(input.Name) < 3 || input.Email == "" || len(input.Password) < 8 {
+		helpers.Error(c, http.StatusBadRequest, "business_name, name, email, dan password (min 8) wajib valid", nil)
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost) // cost 10
+	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal memproses password"})
+		helpers.Error(c, http.StatusInternalServerError, "gagal memproses password", nil)
 		return
 	}
 
-	// User pertama yang mendaftar otomatis menjadi owner; sisanya default staff.
-	role := "staff"
-	var totalUsers int64
-	config.DB.Model(&models.User{}).Count(&totalUsers)
-	if totalUsers == 0 {
-		role = "owner"
-	}
+	var user models.User
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		var existing int64
+		if err := tx.Unscoped().Model(&models.User{}).Where("email = ?", input.Email).Count(&existing).Error; err != nil {
+			return err
+		}
+		if existing > 0 {
+			return gorm.ErrDuplicatedKey
+		}
 
-	user := models.User{
-		Name:     input.Name,
-		Email:    email,
-		Password: string(hash),
-		Role:     role,
+		business := models.Business{Name: input.BusinessName}
+		if err := tx.Create(&business).Error; err != nil {
+			return err
+		}
+		user = models.User{
+			BusinessID:  business.ID,
+			Name:        input.Name,
+			Email:       input.Email,
+			Password:    string(hash),
+			Role:        models.RoleOwner,
+			AuthVersion: 0,
+		}
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.Wallet{
+			BusinessID: business.ID,
+			Name:       "Cash",
+			Balance:    0,
+			Currency:   models.CurrencyIDR,
+		}).Error
+	})
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		helpers.Error(c, http.StatusConflict, "email sudah terdaftar", nil)
+		return
 	}
-
-	if err := config.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal membuat Business dan Owner", nil)
 		return
 	}
 
-	// Buat wallet default "Cash" untuk user baru.
-	if err := config.DB.Create(&models.Wallet{
-		UserID:   user.ID,
-		Name:     "Cash",
-		Balance:  0,
-		Currency: "IDR",
-	}).Error; err != nil {
-		// Jangan gagalkan registrasi hanya karena wallet; tapi log saja.
+	var business models.Business
+	if err := config.DB.First(&business, user.BusinessID).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "registrasi berhasil tetapi Business tidak dapat dibaca", nil)
+		return
 	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "registrasi berhasil",
-		"data": gin.H{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
-		},
+	helpers.Success(c, http.StatusCreated, "registrasi berhasil", gin.H{
+		"user":     userView(&user),
+		"business": businessView(&business),
 	})
 }
 
-// Login memverifikasi kredensial dan mengembalikan Access + Refresh Token.
+// AuthLogin verifies credentials and returns access/refresh tokens.
 func AuthLogin(c *gin.Context) {
 	var input loginInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email dan password wajib diisi"})
+		helpers.Error(c, http.StatusBadRequest, "email dan password wajib diisi", nil)
 		return
 	}
 
 	email := strings.ToLower(strings.TrimSpace(input.Email))
-
 	var user models.User
-	err := config.DB.Where("email = ?", email).First(&user).Error
-	if err == gorm.ErrRecordNotFound {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "email atau password salah"})
+	if err := config.DB.Preload("Business").Where("email = ?", email).First(&user).Error; err != nil {
+		helpers.Error(c, http.StatusUnauthorized, "email atau password salah", nil)
 		return
 	}
+	if user.Business == nil || bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)) != nil {
+		helpers.Error(c, http.StatusUnauthorized, "email atau password salah", nil)
+		return
+	}
+	if models.NormalizeRole(user.Role) == "" {
+		helpers.Error(c, http.StatusUnauthorized, "akun tidak memiliki role yang valid", nil)
+		return
+	}
+
+	access, refresh, err := issueTokens(&user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		helpers.Error(c, http.StatusInternalServerError, "gagal membuat token", nil)
 		return
 	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "email atau password salah"})
-		return
-	}
-
-	accessToken, err := helpers.GenerateAccessToken(user.ID, user.Email, user.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat token"})
-		return
-	}
-
-	refreshToken, err := helpers.GenerateRefreshToken(user.ID, user.Email, user.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat token"})
-		return
-	}
-
-	storeRefreshToken(user.ID, refreshToken)
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "login berhasil",
-		"data": gin.H{
-			"user": gin.H{
-				"id":    user.ID,
-				"name":  user.Name,
-				"email": user.Email,
-				"role":  user.Role,
-			},
-			"access_token":  accessToken,
-			"refresh_token": refreshToken,
-		},
+	helpers.Success(c, http.StatusOK, "login berhasil", gin.H{
+		"user":          userView(&user),
+		"business":      businessView(user.Business),
+		"access_token":  access,
+		"refresh_token": refresh,
 	})
 }
 
-// Refresh menghasilkan Access Token baru dari Refresh Token yang valid.
+// AuthRefresh issues a new access token after rechecking the current database
+// user. Refresh tokens are invalidated by auth_version on logout.
 func AuthRefresh(c *gin.Context) {
 	var input refreshInput
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token wajib diisi"})
+		helpers.Error(c, http.StatusBadRequest, "refresh_token wajib diisi", nil)
 		return
 	}
-
-	if isBlacklisted(input.RefreshToken) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token tidak valid"})
-		return
-	}
-
-	claims, err := helpers.ParseRefreshToken(input.RefreshToken)
+	claims, err := helpers.ParseRefreshToken(strings.TrimSpace(input.RefreshToken))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		helpers.Error(c, http.StatusUnauthorized, "refresh token tidak valid", nil)
 		return
 	}
 
-	// Pastikan refresh token yang dipakai adalah milik user tsb (anti token reuse).
-	if stored, ok := getRefreshToken(claims.UserID); !ok || stored != input.RefreshToken {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token tidak valid"})
+	var user models.User
+	if err := config.DB.Preload("Business").First(&user, claims.UserID).Error; err != nil || user.Business == nil || user.AuthVersion != claims.AuthVersion {
+		helpers.Error(c, http.StatusUnauthorized, "refresh token tidak valid", nil)
 		return
 	}
-
-	// Token lama (sebelum fitur role) tidak punya klaim Role, ambil dari DB.
-	role := claims.Role
-	if role == "" {
-		var user models.User
-		if err := config.DB.First(&user, claims.UserID).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user tidak ditemukan"})
-			return
-		}
-		role = user.Role
-	}
-
-	newAccess, err := helpers.GenerateAccessToken(claims.UserID, claims.Email, role)
+	access, _, err := issueTokens(&user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat token"})
+		helpers.Error(c, http.StatusInternalServerError, "gagal membuat token", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message":      "token berhasil diperbarui",
-		"access_token": newAccess,
-	})
+	helpers.Success(c, http.StatusOK, "token berhasil diperbarui", gin.H{"access_token": access})
 }
 
-// Logout menblacklist token & menghapus refresh token user.
+// AuthLogout increments auth_version, invalidating access and refresh tokens
+// for the user immediately. This intentionally logs out all active sessions.
 func AuthLogout(c *gin.Context) {
-	accessHeader := c.GetHeader("Authorization")
-	var refreshToken string
-
-	// Ambil refresh token dari body bila dikirim.
-	var body struct {
-		RefreshToken string `json:"refresh_token"`
+	userID := middleware.CurrentUserID(c)
+	if userID == 0 {
+		helpers.Error(c, http.StatusUnauthorized, "sesi tidak valid", nil)
+		return
 	}
-	_ = c.ShouldBindJSON(&body)
-	refreshToken = body.RefreshToken
-
-	if accessHeader != "" {
-		parts := strings.SplitN(accessHeader, " ", 2)
-		if len(parts) == 2 {
-			tok := strings.TrimSpace(parts[1])
-			blacklistToken(tok, time.Now().Add(time.Minute*30))
-		}
+	if err := config.DB.Model(&models.User{}).Where("id = ? AND business_id = ?", userID, middleware.CurrentBusinessID(c)).UpdateColumn("auth_version", gorm.Expr("auth_version + 1")).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "logout gagal", nil)
+		return
 	}
-
-	// Ambil user_id dari context (jika route dilindungi AuthJWT).
-	var userID uint
-	if v, ok := c.Get("user_id"); ok {
-		if id, ok2 := v.(uint); ok2 {
-			userID = id
-		}
-	}
-
-	// Jika refresh token disertakan, blacklist & invalidasi session.
-	if refreshToken != "" {
-		blacklistToken(refreshToken, time.Now().Add(time.Hour*24*7))
-		if userID == 0 {
-			if claims, err := helpers.ParseRefreshToken(refreshToken); err == nil {
-				userID = claims.UserID
-			}
-		}
-	}
-
-	if userID != 0 {
-		deleteRefreshToken(userID)
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "logout berhasil, token telah diinvalidasi"})
+	helpers.Success(c, http.StatusOK, "logout berhasil", nil)
 }
 
-// AuthUsers menampilkan seluruh user (khusus owner).
-func AuthUsers(c *gin.Context) {
-	var users []models.User
-	if err := config.DB.
-		Select("id", "name", "email", "role", "created_at", "updated_at").
-		Order("id ASC").
-		Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// AuthMe returns the active authenticated user and Business context.
+func AuthMe(c *gin.Context) {
+	user, ok := c.Get("current_user")
+	if !ok {
+		helpers.Error(c, http.StatusUnauthorized, "sesi tidak valid", nil)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"data": users})
-}
-
-// AuthDeleteUser menghapus (soft delete) akun staff (khusus owner).
-func AuthDeleteUser(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil || id == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id user tidak valid"})
+	current, ok := user.(*models.User)
+	if !ok || current.Business == nil {
+		helpers.Error(c, http.StatusUnauthorized, "sesi tidak valid", nil)
 		return
 	}
-
-	// Owner tidak boleh menghapus akunnya sendiri.
-	if uint(id) == mustUserID(c) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tidak dapat menghapus akun sendiri"})
-		return
-	}
-
-	var target models.User
-	if err := config.DB.First(&target, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user tidak ditemukan"})
-		return
-	}
-
-	if target.Role == "owner" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "tidak dapat menghapus akun owner lainnya"})
-		return
-	}
-
-	// Invalidasi refresh token staff yang dihapus.
-	deleteRefreshToken(target.ID)
-
-	if err := config.DB.Delete(&target).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "user berhasil dihapus"})
+	helpers.Success(c, http.StatusOK, "sesi aktif", gin.H{
+		"user":     userView(current),
+		"business": businessView(current.Business),
+	})
 }

@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 
+	"cashmate-api/helpers"
+	"cashmate-api/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -10,9 +12,8 @@ import (
 // Dipakai setelah middleware AuthJWT (role sudah di-set ke context).
 func RoleOwner() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, _ := c.Get("role")
-		if role != "owner" {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "akses ditolak: hanya owner yang diizinkan"})
+		if CurrentUserRole(c) != models.RoleOwner {
+			helpers.Error(c, http.StatusForbidden, "akses ditolak: hanya Owner yang diizinkan", nil)
 			return
 		}
 		c.Next()
@@ -23,7 +24,7 @@ func RoleOwner() gin.HandlerFunc {
 func CurrentUserRole(c *gin.Context) string {
 	if v, ok := c.Get("role"); ok {
 		if role, ok2 := v.(string); ok2 {
-			return role
+			return models.NormalizeRole(role)
 		}
 	}
 	return ""
