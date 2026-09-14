@@ -29,10 +29,9 @@ services:
       dockerfile: Dockerfile
     container_name: cashmate-api
     restart: always
-    # Hanya bisa diakses dari VPS sendiri (localhost:8096).
-    # Publik mengakses lewat nginx (80/443).
+    # Publik dapat mengakses API langsung via http://VPS_IP:8096 .
     ports:
-      - "127.0.0.1:8096:8096"
+      - "8096:8096"
     env_file:
       - .env
     environment:

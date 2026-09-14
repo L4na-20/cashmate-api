@@ -1,0 +1,690 @@
+{
+  "info": {
+    "name": "CashMate API",
+    "_postman_id": "c73c09a9-6f76-4ba0-9bae-c9e905237d2f",
+    "description": "Collection resmi CashMate REST API (Gin + GORM).\n\nBase URL memakai variable {{base_url}} (default http://localhost:8081/api). Ganti nilai variable base_url dengan IP VPS + port publik (mis. http://103.x.x.x/api atau https://api.domainmu.com) sesuai environment.\n\nAlur penggunaan:\n1. Buka folder Auth -> Login, isi email & password yang sudah terdaftar.\n2. Kirim request Login -> script Test otomatis menyimpan access_token & refresh_token ke environment/collection variables.\n3. Seluruh endpoint protected (Wallets, Categories, Transactions, Dashboard, Reports) otomatis mengirim header `Authorization: Bearer {{access_token}}`.\n4. Saat access token kedaluwarsa (30 menit), panggil Auth -> Refresh dengan refresh_token, lalu lanjutkan.\n\nCatatan auth:\n- Register wajib: name (min 3 char), email valid, password (min 8 char).\n- Wallet default \"Cash\" dibuat otomatis saat register.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8081/api",
+      "type": "default"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "default"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Budi Santoso\",\n  \"email\": \"budi@example.com\",\n  \"password\": \"rahasia123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Membuat akun baru. Wajib: name (min 3), email valid, password (min 8). Password di-hash (bcrypt).\n\nResponse 201:\n{\n  \"message\": \"registrasi berhasil\",\n  \"data\": {\n    \"id\": 1,\n    \"name\": \"Budi Santoso\",\n    \"email\": \"budi@example.com\"\n  }\n}\n\nError: 409 jika email sudah terdaftar."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.data) {",
+                  "    if (json.data.access_token) {",
+                  "        pm.environment.set(\"access_token\", json.data.access_token);",
+                  "        pm.collectionVariables.set(\"access_token\", json.data.access_token);",
+                  "    }",
+                  "    if (json.data.refresh_token) {",
+                  "        pm.environment.set(\"refresh_token\", json.data.refresh_token);",
+                  "        pm.collectionVariables.set(\"refresh_token\", json.data.refresh_token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"budi@example.com\",\n  \"password\": \"rahasia123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login dan dapatkan Access + Refresh Token.\n\nScript Test otomatis menyimpan `access_token` dan `refresh_token` ke environment & collection variables, sehingga endpoint protected langsung bisa dipanggil.\n\nResponse 200:\n{\n  \"message\": \"login berhasil\",\n  \"data\": {\n    \"user\": { \"id\": 1, \"name\": \"Budi Santoso\", \"email\": \"budi@example.com\" },\n    \"access_token\": \"...\",\n    \"refresh_token\": \"...\"\n  }\n}\n\nError: 401 jika email/password salah."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (pm.response.code === 200 && json.access_token) {",
+                  "    pm.environment.set(\"access_token\", json.access_token);",
+                  "    pm.collectionVariables.set(\"access_token\", json.access_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Menukar refresh_token yang valid dengan access_token baru.\n\nResponse 200:\n{\n  \"message\": \"token berhasil diperbarui\",\n  \"access_token\": \"...\"\n}\n\nScript Test otomatis memperbarui `access_token`."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Logout: mem-blacklist access token & revoke refresh token.\n\nResponse 200:\n{\n  \"message\": \"logout berhasil, token telah diinvalidasi\"\n}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Wallets",
+      "item": [
+        {
+          "name": "Get All Wallets",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallets"
+              ]
+            },
+            "description": "Menampilkan seluruh wallet milik user yang login (urut created_at ASC).\n\nResponse 200:\n{\n  \"data\": [\n    {\n      \"id\": 1,\n      \"user_id\": 1,\n      \"name\": \"Cash\",\n      \"balance\": 500000,\n      \"currency\": \"IDR\",\n      \"created_at\": \"...\",\n      \"updated_at\": \"...\"\n    }\n  ]\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Wallet by ID",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallets/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallets",
+                "1"
+              ]
+            },
+            "description": "Menampilkan satu wallet milik user. Ganti angka 1 pada URL dengan id wallet. Anti-IDOR: wallet milik user lain -> 404.\n\nResponse 200:\n{\n  \"data\": {\n    \"id\": 1,\n    \"user_id\": 1,\n    \"name\": \"Cash\",\n    \"balance\": 500000,\n    \"currency\": \"IDR\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Wallet",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"E-Money (OVO)\",\n  \"balance\": 250000,\n  \"currency\": \"IDR\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/wallets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallets"
+              ]
+            },
+            "description": "Membuat wallet baru.\n\nWajib: name (min 1 char), currency (tepat 3 huruf, contoh IDR). balance default 0, harus >= 0.\n\nResponse 201:\n{\n  \"message\": \"wallet berhasil dibuat\",\n  \"data\": {\n    \"id\": 2,\n    \"user_id\": 1,\n    \"name\": \"E-Money (OVO)\",\n    \"balance\": 250000,\n    \"currency\": \"IDR\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Wallet",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"E-Money (OVO)\",\n  \"balance\": 300000,\n  \"currency\": \"IDR\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/wallets/2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallets",
+                "2"
+              ]
+            },
+            "description": "Memperbarui wallet milik user. Ganti angka 2 pada URL dengan id wallet.\n\nResponse 200:\n{\n  \"message\": \"wallet berhasil diperbarui\",\n  \"data\": { ... }
+}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Wallet",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallets/2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallets",
+                "2"
+              ]
+            },
+            "description": "Menandai wallet sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen & transaksinya ikut tersimpan. Ganti angka 2 pada URL dengan id wallet.\n\nResponse 200:\n{\n  \"message\": \"wallet berhasil dihapus\"\n}\n\nPulihkan dengan: UPDATE wallets SET deleted_at = NULL WHERE id = <id>;"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/categories?type=expense",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "expense"
+                }
+              ]
+            },
+            "description": "Menampilkan kategori global + kategori milik user. Query `type` opsional: income / expense (kosongkan untuk semua).\n\nContoh query param:\n?type=expense   -> hanya kategori jenis expense\n?type=income    -> hanya kategori jenis income\n(tanpa query)    -> semua type\n\nResponse 200:\n{\n  \"data\": [\n    { \"id\": 1, \"user_id\": null, \"name\": \"Makanan\", \"type\": \"expense\", \"created_at\": \"...\", \"updated_at\": \"...\" },\n    { \"id\": 5, \"user_id\": 1, \"name\": \"Gaji\", \"type\": \"income\", \"created_at\": \"...\", \"updated_at\": \"...\" }\n  ]\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Transportasi\",\n  \"type\": \"expense\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories"
+              ]
+            },
+            "description": "Membuat kategori baru milik user.\n\nWajib: name (min 1 char), type harus `income` atau `expense`.\n\nError 409 jika sudah ada kategori dengan nama+tipe yang sama.\n\nResponse 201:\n{\n  \"message\": \"kategori berhasil dibuat\",\n  \"data\": {\n    \"id\": 6,\n    \"user_id\": 1,\n    \"name\": \"Transportasi\",\n    \"type\": \"expense\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Category",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Transportasi Umum\",\n  \"type\": \"expense\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/categories/6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                "6"
+              ]
+            },
+            "description": "Memperbarui kategori milik user (kategori global tidak bisa diedit). Ganti angka 6 pada URL dengan id kategori.\n\nResponse 200:\n{\n  \"message\": \"kategori berhasil diperbarui\",\n  \"data\": { ... }\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/categories/6",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                "6"
+              ]
+            },
+            "description": "Menandai kategori sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen. Ganti angka 6 pada URL dengan id kategori.\n\nError 409 jika kategori masih dipakai transaksi aktif.\n\nResponse 200:\n{\n  \"message\": \"kategori berhasil dihapus\"\n}\n\nPulihkan dengan: UPDATE categories SET deleted_at = NULL WHERE id = <id>;"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Get All Transactions",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transactions?page=1&per_page=15&type=expense&from_date=2026-01-01&to_date=2026-12-31",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "15"
+                },
+                {
+                  "key": "type",
+                  "value": "expense"
+                },
+                {
+                  "key": "from_date",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "to_date",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "wallet_id",
+                  "value": "1"
+                },
+                {
+                  "key": "category_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Histori transaksi milik user, terpaginasi.\n\nQuery params (semua opsional):\n- page        : halaman (default 1)\n- per_page    : jumlah per halaman, 1-100 (default 15)\n- type        : income / expense\n- from_date   : mulai tanggal (YYYY-MM-DD)\n- to_date     : sampai tanggal (YYYY-MM-DD)\n- wallet_id   : filter wallet (harus milik user)\n- category_id : filter kategori (global atau milik user)\n\nResponse 200:\n{\n  \"data\": [\n    {\n      \"id\": 1,\n      \"wallet_id\": 1,\n      \"category_id\": 1,\n      \"amount\": 25000,\n      \"type\": \"expense\",\n      \"description\": \"Makan siang\",\n      \"date\": \"2026-09-14T00:00:00Z\",\n      \"created_at\": \"...\",\n      \"updated_at\": \"...\",\n      \"wallet\": { ... },\n      \"category\": { ... }\n    }\n  ],\n  \"total\": 10,\n  \"from\": 1,\n  \"to\": 10,\n  \"per_page\": 15,\n  \"current_page\": 1,\n  \"last_page\": 1\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Transaction",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": 1,\n  \"amount\": 25000,\n  \"type\": \"expense\",\n  \"category_id\": 1,\n  \"description\": \"Makan siang\",\n  \"date\": \"2026-09-14\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/transactions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions"
+              ]
+            },
+            "description": "Mencatat transaksi baru sekaligus memperbarui saldo wallet.\n\nWajib: wallet_id, amount (> 0), type (income/expense), category_id. Optional: description, date (YYYY-MM-DD, default hari ini).\n\nKetentuan:\n- wallet_id harus milik user (anti-IDOR).\n- category_id harus global atau milik user.\n- Tipe kategori harus cocok dengan tipe transaksi.\n\nResponse 201:\n{\n  \"message\": \"transaksi berhasil disimpan\",\n  \"data\": { ... }\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Transaction",
+          "event": [],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": 1,\n  \"amount\": 30000,\n  \"type\": \"expense\",\n  \"category_id\": 1,\n  \"description\": \"Makan siang (termasuk es teh)\",\n  \"date\": \"2026-09-14\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/transactions/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "1"
+              ]
+            },
+            "description": "Memperbarui transaksi milik user. Saldo wallet lama dikembalikan, lalu saldo baru diterapkan. Ganti angka 1 pada URL dengan id transaksi.\n\nResponse 200:\n{\n  \"message\": \"transaksi berhasil diperbarui\",\n  \"data\": { ... }\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Transaction",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transactions/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "1"
+              ]
+            },
+            "description": "Menandai transaksi sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen. Saldo wallet tetap dikembalikan seperti aturan sebelumnya, dan transaksi ini tidak lagi dihitung di laporan. Ganti angka 1 pada URL dengan id transaksi.\n\nResponse 200:\n{\n  \"message\": \"transaksi berhasil dihapus\"\n}\n\nPulihkan dengan: UPDATE transactions SET deleted_at = NULL WHERE id = <id>;"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard & Reports",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dashboard",
+                "summary"
+              ]
+            },
+            "description": "Ringkasan keuangan user yang login.\n\nResponse 200:\n{\n  \"total_income\": 5000000,\n  \"total_expense\": 1250000,\n  \"balance\": 3750000,\n  \"transaction_count\": {\n    \"income\": 3,\n    \"expense\": 12\n  },\n  \"recent_transactions\": [ ... 5 transaksi terbaru ... ]\n}"
+          },
+          "response": []
+        },
+        {
+          "name": "Monthly Report",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/reports/monthly?year=2026",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "reports",
+                "monthly"
+              ],
+              "query": [
+                {
+                  "key": "year",
+                  "value": "2026"
+                }
+              ]
+            },
+            "description": "Laporan income & expense per bulan.\n\nQuery param:\n- year : tahun yang dilaporkan (default tahun berjalan). Kirim 0/`year=0` untuk semua tahun.\n\nContoh:\n?year=2026  -> laporan tahun 2026\n?year=0     -> semua tahun\n\nResponse 200:\n{\n  \"data\": [\n    {\n      \"month\": \"2026-01\",\n      \"income\": 5000000,\n      \"expense\": 2000000,\n      \"balance\": 3000000\n    }\n  ]\n}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Cek status API (tidak butuh autentikasi).\n\nResponse 200:\n{\n  \"status\": \"ok\",\n  \"service\": \"cashmate-api\"\n}"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
