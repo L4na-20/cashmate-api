@@ -1,4 +1,4 @@
-imageservices:
+services:
   # =====================
   # Service Nginx (Reverse Proxy + HTTPS)
   # Satu-satunya pintu masuk dari internet (port 80/443).
