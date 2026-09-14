@@ -147,3 +147,27 @@ func WalletsDestroy(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "wallet berhasil dihapus"})
 }
+
+// WalletsRestore memulihkan wallet yang sudah di-soft delete (deleted_at -> NULL).
+func WalletsRestore(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id wallet tidak valid"})
+		return
+	}
+
+	userID := mustUserID(c)
+	var wallet models.Wallet
+	if err := config.DB.Unscoped().Where("id = ? AND user_id = ?", id, userID).
+		First(&wallet).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "wallet tidak ditemukan"})
+		return
+	}
+
+	if err := config.DB.Unscoped().Model(&wallet).Update("deleted_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "wallet berhasil dipulihkan"})
+}

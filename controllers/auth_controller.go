@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -101,8 +102,10 @@ func AuthRegister(c *gin.Context) {
 	email := strings.ToLower(strings.TrimSpace(helpers.Sanitize(input.Email)))
 	input.Name = helpers.Sanitize(input.Name)
 
+	// Pengecekan email tetap menimbang user yang sudah di-soft delete,
+	// agar alamat email tidak bisa didaftarkan dua kali.
 	var count int64
-	config.DB.Model(&models.User{}).Where("email = ?", email).Count(&count)
+	config.DB.Unscoped().Model(&models.User{}).Where("email = ?", email).Count(&count)
 	if count > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "email sudah terdaftar"})
 		return
@@ -114,10 +117,19 @@ func AuthRegister(c *gin.Context) {
 		return
 	}
 
+	// User pertama yang mendaftar otomatis menjadi owner; sisanya default staff.
+	role := "staff"
+	var totalUsers int64
+	config.DB.Model(&models.User{}).Count(&totalUsers)
+	if totalUsers == 0 {
+		role = "owner"
+	}
+
 	user := models.User{
 		Name:     input.Name,
 		Email:    email,
 		Password: string(hash),
+		Role:     role,
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
@@ -141,6 +153,7 @@ func AuthRegister(c *gin.Context) {
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  user.Role,
 		},
 	})
 }
@@ -171,13 +184,13 @@ func AuthLogin(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := helpers.GenerateAccessToken(user.ID, user.Email)
+	accessToken, err := helpers.GenerateAccessToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat token"})
 		return
 	}
 
-	refreshToken, err := helpers.GenerateRefreshToken(user.ID, user.Email)
+	refreshToken, err := helpers.GenerateRefreshToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat token"})
 		return
@@ -192,6 +205,7 @@ func AuthLogin(c *gin.Context) {
 				"id":    user.ID,
 				"name":  user.Name,
 				"email": user.Email,
+				"role":  user.Role,
 			},
 			"access_token":  accessToken,
 			"refresh_token": refreshToken,
@@ -224,7 +238,18 @@ func AuthRefresh(c *gin.Context) {
 		return
 	}
 
-	newAccess, err := helpers.GenerateAccessToken(claims.UserID, claims.Email)
+	// Token lama (sebelum fitur role) tidak punya klaim Role, ambil dari DB.
+	role := claims.Role
+	if role == "" {
+		var user models.User
+		if err := config.DB.First(&user, claims.UserID).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user tidak ditemukan"})
+			return
+		}
+		role = user.Role
+	}
+
+	newAccess, err := helpers.GenerateAccessToken(claims.UserID, claims.Email, role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal membuat token"})
 		return
@@ -279,4 +304,54 @@ func AuthLogout(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "logout berhasil, token telah diinvalidasi"})
+}
+
+// AuthUsers menampilkan seluruh user (khusus owner).
+func AuthUsers(c *gin.Context) {
+	var users []models.User
+	if err := config.DB.
+		Select("id", "name", "email", "role", "created_at", "updated_at").
+		Order("id ASC").
+		Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": users})
+}
+
+// AuthDeleteUser menghapus (soft delete) akun staff (khusus owner).
+func AuthDeleteUser(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id user tidak valid"})
+		return
+	}
+
+	// Owner tidak boleh menghapus akunnya sendiri.
+	if uint(id) == mustUserID(c) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tidak dapat menghapus akun sendiri"})
+		return
+	}
+
+	var target models.User
+	if err := config.DB.First(&target, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user tidak ditemukan"})
+		return
+	}
+
+	if target.Role == "owner" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "tidak dapat menghapus akun owner lainnya"})
+		return
+	}
+
+	// Invalidasi refresh token staff yang dihapus.
+	deleteRefreshToken(target.ID)
+
+	if err := config.DB.Delete(&target).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "user berhasil dihapus"})
 }

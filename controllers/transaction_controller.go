@@ -317,3 +317,43 @@ func TransactionsDestroy(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "transaksi berhasil dihapus"})
 }
+
+// TransactionsRestore memulihkan transaksi yang sudah di-soft delete dan
+// mengembalikan efeknya ke saldo wallet (agar laporan & saldo konsisten).
+func TransactionsRestore(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id transaksi tidak valid"})
+		return
+	}
+
+	userID := mustUserID(c)
+	var transaction models.Transaction
+	if err := config.DB.Unscoped().First(&transaction, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
+		return
+	}
+	if !isWalletOwner(c, transaction.WalletID) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
+		return
+	}
+
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Model(&transaction).Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		delta := transaction.Amount
+		if transaction.Type == "expense" {
+			delta = -delta
+		}
+		return tx.Model(&models.Wallet{}).
+			Where("id = ? AND user_id = ?", transaction.WalletID, userID).
+			Update("balance", gorm.Expr("balance + ?", delta)).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "transaksi berhasil dipulihkan"})
+}

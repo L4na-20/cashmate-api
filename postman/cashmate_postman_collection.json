@@ -2,13 +2,13 @@
   "info": {
     "name": "CashMate API",
     "_postman_id": "c73c09a9-6f76-4ba0-9bae-c9e905237d2f",
-    "description": "Collection resmi CashMate REST API (Gin + GORM).\n\nBase URL memakai variable {{base_url}} (default http://localhost:8081/api). Ganti nilai variable base_url dengan IP VPS + port publik (mis. http://103.x.x.x/api atau https://api.domainmu.com) sesuai environment.\n\nAlur penggunaan:\n1. Buka folder Auth -> Login, isi email & password yang sudah terdaftar.\n2. Kirim request Login -> script Test otomatis menyimpan access_token & refresh_token ke environment/collection variables.\n3. Seluruh endpoint protected (Wallets, Categories, Transactions, Dashboard, Reports) otomatis mengirim header `Authorization: Bearer {{access_token}}`.\n4. Saat access token kedaluwarsa (30 menit), panggil Auth -> Refresh dengan refresh_token, lalu lanjutkan.\n\nCatatan auth:\n- Register wajib: name (min 3 char), email valid, password (min 8 char).\n- Wallet default \"Cash\" dibuat otomatis saat register.",
+    "description": "Collection resmi CashMate REST API (Gin + GORM).\n\nBase URL memakai variable {{base_url}} (default http://localhost:8096/api). Ganti nilai variable base_url dengan IP VPS + port publik (mis. http://VPS_IP:8096/api atau https://api.domainmu.com) sesuai environment.\n\nSISTEM ROLE (owner / staff):\n- User PERTAMA yang mendaftar (POST /auth/register) otomatis menjadi OWNER.\n- User berikutnya yang mendaftar otomatis menjadi STAFF.\n- OWNER bisa: kelola wallet & kategori (buat/ubah/hapus/restore), semua transaksi, dashboard, laporan bulanan, dan kelola user (lihat & hapus staff).\n- STAFF hanya bisa: lihat wallet & kategori, mencatat/ubah/hapus transaksi, dan lihat dashboard miliknya sendiri. Endpoint khusus owner akan memunculkan 403 bila dipakai staff.\n- Saat login, script otomatis menyimpan role user ke variable user_role untuk referensi.\n\nAlur penggunaan:\n1. Buka folder Auth -> Login, isi email & password yang sudah terdaftar.\n2. Kirim request Login -> script Test otomatis menyimpan access_token & refresh_token ke environment/collection variables.\n3. Seluruh endpoint protected (Wallets, Categories, Transactions, Dashboard, Reports, Users) otomatis mengirim header `Authorization: Bearer {{access_token}}`.\n4. Saat access token kedaluwarsa (30 menit), panggil Auth -> Refresh dengan refresh_token, lalu lanjutkan.\n\nCatatan auth:\n- Register wajib: name (min 3 char), email valid, password (min 8 char).\n- Wallet default \"Cash\" dibuat otomatis saat register.\n- Paket testing sederet: Register (Owner) -> Login -> buat data -> Register akun staff kedua -> Login staff -> bandingkan akses (staff kena 403 di endpoint bertanda Owner).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:8081/api",
+      "value": "http://localhost:8096/api",
       "type": "default"
     },
     {
@@ -18,6 +18,11 @@
     },
     {
       "key": "refresh_token",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "user_role",
       "value": "",
       "type": "default"
     }
@@ -51,7 +56,7 @@
                 "register"
               ]
             },
-            "description": "Membuat akun baru. Wajib: name (min 3), email valid, password (min 8). Password di-hash (bcrypt).\n\nResponse 201:\n{\n  \"message\": \"registrasi berhasil\",\n  \"data\": {\n    \"id\": 1,\n    \"name\": \"Budi Santoso\",\n    \"email\": \"budi@example.com\"\n  }\n}\n\nError: 409 jika email sudah terdaftar."
+            "description": "Membuat akun baru. Wajib: name (min 3), email valid, password (min 8). Password di-hash (bcrypt).\n\nPENTING (role):\n- User PERTAMA yang terdaftar otomatis menjadi OWNER.\n- User berikutnya otomatis menjadi STAFF.\n\nResponse 201:\n{\n  \"message\": \"registrasi berhasil\",\n  \"data\": {\n    \"id\": 1,\n    \"name\": \"Budi Santoso\",\n    \"email\": \"budi@example.com\",\n    \"role\": \"owner\"\n  }\n}\n\nError: 409 jika email sudah terdaftar."
           },
           "response": []
         },
@@ -72,6 +77,10 @@
                   "    if (json.data.refresh_token) {",
                   "        pm.environment.set(\"refresh_token\", json.data.refresh_token);",
                   "        pm.collectionVariables.set(\"refresh_token\", json.data.refresh_token);",
+                  "    }",
+                  "    if (json.data.user && json.data.user.role) {",
+                  "        pm.environment.set(\"user_role\", json.data.user.role);",
+                  "        pm.collectionVariables.set(\"user_role\", json.data.user.role);",
                   "    }",
                   "}"
                 ]
@@ -100,7 +109,7 @@
                 "login"
               ]
             },
-            "description": "Login dan dapatkan Access + Refresh Token.\n\nScript Test otomatis menyimpan `access_token` dan `refresh_token` ke environment & collection variables, sehingga endpoint protected langsung bisa dipanggil.\n\nResponse 200:\n{\n  \"message\": \"login berhasil\",\n  \"data\": {\n    \"user\": { \"id\": 1, \"name\": \"Budi Santoso\", \"email\": \"budi@example.com\" },\n    \"access_token\": \"...\",\n    \"refresh_token\": \"...\"\n  }\n}\n\nError: 401 jika email/password salah."
+            "description": "Login dan dapatkan Access + Refresh Token.\n\nScript Test otomatis menyimpan `access_token`, `refresh_token`, dan `user_role` (owner/staff) ke environment & collection variables, sehingga endpoint protected langsung bisa dipanggil.\n\nResponse 200:\n{\n  \"message\": \"login berhasil\",\n  \"data\": {\n    \"user\": { \"id\": 1, \"name\": \"Budi Santoso\", \"email\": \"budi@example.com\", \"role\": \"owner\" },\n    \"access_token\": \"...\",\n    \"refresh_token\": \"...\"\n  }\n}\n\nError: 401 jika email/password salah."
           },
           "response": []
         },
@@ -235,7 +244,7 @@
           "response": []
         },
         {
-          "name": "Create Wallet",
+          "name": "Create Wallet (Owner)",
           "event": [],
           "request": {
             "method": "POST",
@@ -262,12 +271,12 @@
                 "wallets"
               ]
             },
-            "description": "Membuat wallet baru.\n\nWajib: name (min 1 char), currency (tepat 3 huruf, contoh IDR). balance default 0, harus >= 0.\n\nResponse 201:\n{\n  \"message\": \"wallet berhasil dibuat\",\n  \"data\": {\n    \"id\": 2,\n    \"user_id\": 1,\n    \"name\": \"E-Money (OVO)\",\n    \"balance\": 250000,\n    \"currency\": \"IDR\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
+            "description": "Khusus OWNER. Staff akan menerima 403 Forbidden.\n\nMembuat wallet baru.\n\nWajib: name (min 1 char), currency (tepat 3 huruf, contoh IDR). balance default 0, harus >= 0.\n\nResponse 201:\n{\n  \"message\": \"wallet berhasil dibuat\",\n  \"data\": {\n    \"id\": 2,\n    \"user_id\": 1,\n    \"name\": \"E-Money (OVO)\",\n    \"balance\": 250000,\n    \"currency\": \"IDR\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
           },
           "response": []
         },
         {
-          "name": "Update Wallet",
+          "name": "Update Wallet (Owner)",
           "event": [],
           "request": {
             "method": "PUT",
@@ -301,7 +310,7 @@
           "response": []
         },
         {
-          "name": "Delete Wallet",
+          "name": "Delete Wallet (Owner)",
           "event": [],
           "request": {
             "method": "DELETE",
@@ -321,7 +330,33 @@
                 "2"
               ]
             },
-            "description": "Menandai wallet sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen & transaksinya ikut tersimpan. Ganti angka 2 pada URL dengan id wallet.\n\nResponse 200:\n{\n  \"message\": \"wallet berhasil dihapus\"\n}\n\nPulihkan dengan: UPDATE wallets SET deleted_at = NULL WHERE id = <id>;"
+            "description": "Menandai wallet sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen & transaksinya ikut tersimpan. Ganti angka 2 pada URL dengan id wallet.\n\nResponse 200:\n{\n  \"message\": \"wallet berhasil dihapus\"\n}\n\nPulihkan dengan request \"Restore Wallet\" (POST /wallets/:id/restore)."
+          },
+          "response": []
+        },
+        {
+          "name": "Restore Wallet (Owner)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wallets/2/restore",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wallets",
+                "2",
+                "restore"
+              ]
+            },
+            "description": "Memulihkan wallet yang sudah di-soft delete (deleted_at -> NULL). Ganti angka 2 pada URL dengan id wallet.\n\nResponse 200:\n{\n  \"message\": \"wallet berhasil dipulihkan\"\n}"
           },
           "response": []
         }
@@ -361,7 +396,7 @@
           "response": []
         },
         {
-          "name": "Create Category",
+          "name": "Create Category (Owner)",
           "event": [],
           "request": {
             "method": "POST",
@@ -388,12 +423,12 @@
                 "categories"
               ]
             },
-            "description": "Membuat kategori baru milik user.\n\nWajib: name (min 1 char), type harus `income` atau `expense`.\n\nError 409 jika sudah ada kategori dengan nama+tipe yang sama.\n\nResponse 201:\n{\n  \"message\": \"kategori berhasil dibuat\",\n  \"data\": {\n    \"id\": 6,\n    \"user_id\": 1,\n    \"name\": \"Transportasi\",\n    \"type\": \"expense\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
+            "description": "Khusus OWNER. Staff akan menerima 403 Forbidden.\n\nMembuat kategori baru milik user.\n\nWajib: name (min 1 char), type harus `income` atau `expense`.\n\nError 409 jika sudah ada kategori dengan nama+tipe yang sama.\n\nResponse 201:\n{\n  \"message\": \"kategori berhasil dibuat\",\n  \"data\": {\n    \"id\": 6,\n    \"user_id\": 1,\n    \"name\": \"Transportasi\",\n    \"type\": \"expense\",\n    \"created_at\": \"...\",\n    \"updated_at\": \"...\"\n  }\n}"
           },
           "response": []
         },
         {
-          "name": "Update Category",
+          "name": "Update Category (Owner)",
           "event": [],
           "request": {
             "method": "PUT",
@@ -426,7 +461,7 @@
           "response": []
         },
         {
-          "name": "Delete Category",
+          "name": "Delete Category (Owner)",
           "event": [],
           "request": {
             "method": "DELETE",
@@ -446,7 +481,33 @@
                 "6"
               ]
             },
-            "description": "Menandai kategori sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen. Ganti angka 6 pada URL dengan id kategori.\n\nError 409 jika kategori masih dipakai transaksi aktif.\n\nResponse 200:\n{\n  \"message\": \"kategori berhasil dihapus\"\n}\n\nPulihkan dengan: UPDATE categories SET deleted_at = NULL WHERE id = <id>;"
+            "description": "Menandai kategori sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen. Ganti angka 6 pada URL dengan id kategori.\n\nError 409 jika kategori masih dipakai transaksi aktif.\n\nResponse 200:\n{\n  \"message\": \"kategori berhasil dihapus\"\n}\n\nPulihkan dengan request \"Restore Category\" (POST /categories/:id/restore)."
+          },
+          "response": []
+        },
+        {
+          "name": "Restore Category (Owner)",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/categories/6/restore",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "categories",
+                "6",
+                "restore"
+              ]
+            },
+            "description": "Memulihkan kategori yang sudah di-soft delete (deleted_at -> NULL). Ganti angka 6 pada URL dengan id kategori.\n\nResponse 200:\n{\n  \"message\": \"kategori berhasil dipulihkan\"\n}"
           },
           "response": []
         }
@@ -595,7 +656,33 @@
                 "1"
               ]
             },
-            "description": "Menandai transaksi sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen. Saldo wallet tetap dikembalikan seperti aturan sebelumnya, dan transaksi ini tidak lagi dihitung di laporan. Ganti angka 1 pada URL dengan id transaksi.\n\nResponse 200:\n{\n  \"message\": \"transaksi berhasil dihapus\"\n}\n\nPulihkan dengan: UPDATE transactions SET deleted_at = NULL WHERE id = <id>;"
+            "description": "Menandai transaksi sebagai NON-AKTIF (soft delete via deleted_at), data tidak dihapus permanen. Saldo wallet tetap dikembalikan seperti aturan sebelumnya, dan transaksi ini tidak lagi dihitung di laporan. Ganti angka 1 pada URL dengan id transaksi.\n\nResponse 200:\n{\n  \"message\": \"transaksi berhasil dihapus\"\n}\n\nPulihkan dengan request \"Restore Transaction\" (POST /transactions/:id/restore)."
+          },
+          "response": []
+        },
+        {
+          "name": "Restore Transaction",
+          "event": [],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/transactions/1/restore",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "transactions",
+                "1",
+                "restore"
+              ]
+            },
+            "description": "Memulihkan transaksi yang sudah di-soft delete (deleted_at -> NULL) dan otomatis menyesuaikan saldo wallet (saldo dikembalikan seperti transaksi aktif). Ganti angka 1 pada URL dengan id transaksi.\n\nResponse 200:\n{\n  \"message\": \"transaksi berhasil dipulihkan\"\n}"
           },
           "response": []
         }
@@ -625,12 +712,12 @@
                 "summary"
               ]
             },
-            "description": "Ringkasan keuangan user yang login.\n\nResponse 200:\n{\n  \"total_income\": 5000000,\n  \"total_expense\": 1250000,\n  \"balance\": 3750000,\n  \"transaction_count\": {\n    \"income\": 3,\n    \"expense\": 12\n  },\n  \"recent_transactions\": [ ... 5 transaksi terbaru ... ]\n}"
+            "description": "Ringkasan keuangan user yang login (bisa dipakai staff & owner, hasil sesuai data masing-masing).\n\nResponse 200:\n{\n  \"total_income\": 5000000,\n  \"total_expense\": 1250000,\n  \"balance\": 3750000,\n  \"transaction_count\": {\n    \"income\": 3,\n    \"expense\": 12\n  },\n  \"recent_transactions\": [ ... 5 transaksi terbaru ... ]\n}"
           },
           "response": []
         },
         {
-          "name": "Monthly Report",
+          "name": "Monthly Report (Owner)",
           "event": [],
           "request": {
             "method": "GET",
@@ -656,7 +743,63 @@
                 }
               ]
             },
-            "description": "Laporan income & expense per bulan.\n\nQuery param:\n- year : tahun yang dilaporkan (default tahun berjalan). Kirim 0/`year=0` untuk semua tahun.\n\nContoh:\n?year=2026  -> laporan tahun 2026\n?year=0     -> semua tahun\n\nResponse 200:\n{\n  \"data\": [\n    {\n      \"month\": \"2026-01\",\n      \"income\": 5000000,\n      \"expense\": 2000000,\n      \"balance\": 3000000\n    }\n  ]\n}"
+            "description": "Laporan income & expense per bulan (khusus OWNER, staff akan menerima 403).\n\nQuery param:\n- year : tahun yang dilaporkan (default tahun berjalan). Kirim 0/`year=0` untuk semua tahun.\n\nContoh:\n?year=2026  -> laporan tahun 2026\n?year=0     -> semua tahun\n\nResponse 200:\n{\n  \"data\": [\n    {\n      \"month\": \"2026-01\",\n      \"income\": 5000000,\n      \"expense\": 2000000,\n      \"balance\": 3000000\n    }\n  ]\n}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users (Owner)",
+      "item": [
+        {
+          "name": "List All Users",
+          "event": [],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/users",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "users"
+              ]
+            },
+            "description": "Menampilkan seluruh user (khusus OWNER).\n\nResponse 200:\n{\n  \"data\": [\n    { \"id\": 1, \"name\": \"Budi Santoso\", \"email\": \"budi@example.com\", \"role\": \"owner\", \"created_at\": \"...\", \"updated_at\": \"...\" },\n    { \"id\": 2, \"name\": \"Dina Staff\", \"email\": \"dina@example.com\", \"role\": \"staff\", \"created_at\": \"...\", \"updated_at\": \"...\" }\n  ]\n}\n\nSaat dipakai staff -> 403 Forbidden."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Staff User",
+          "event": [],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/users/2",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "users",
+                "2"
+              ]
+            },
+            "description": "Menghapus (soft delete) akun STAFF (khusus OWNER). Ganti angka 2 pada URL dengan id user staff.\n\nCatatan:\n- Tidak bisa menghapus akun sendiri (400).\n- Tidak bisa menghapus akun owner lain (403).\n\nResponse 200:\n{\n  \"message\": \"user berhasil dihapus\"\n}"
           },
           "response": []
         }

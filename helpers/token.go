@@ -24,20 +24,22 @@ func secretRefresh() []byte {
 	return []byte(config.JWTRefreshSecret())
 }
 
-// JWTClaims adalah klaim standar JWT ditambah user_id.
+// JWTClaims adalah klaim standar JWT ditambah user_id, email & role.
 type JWTClaims struct {
 	UserID uint   `json:"user_id"`
 	Email  string `json:"email"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
 // GenerateAccessToken membuat Access Token JWT yang berlaku singkat.
-func GenerateAccessToken(userID uint, email string) (string, error) {
+func GenerateAccessToken(userID uint, email string, role string) (string, error) {
 	ttl := time.Minute * time.Duration(config.AccessTokenTTL())
 
 	claims := JWTClaims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -50,12 +52,13 @@ func GenerateAccessToken(userID uint, email string) (string, error) {
 }
 
 // GenerateRefreshToken membuat Refresh Token JWT yang berlaku lama.
-func GenerateRefreshToken(userID uint, email string) (string, error) {
+func GenerateRefreshToken(userID uint, email string, role string) (string, error) {
 	ttl := time.Hour * time.Duration(config.RefreshTokenTTL())
 
 	claims := JWTClaims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

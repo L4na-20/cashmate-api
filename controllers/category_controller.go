@@ -180,3 +180,27 @@ func CategoriesDestroy(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "kategori berhasil dihapus"})
 }
+
+// CategoriesRestore memulihkan kategori milik user yang sudah di-soft delete.
+func CategoriesRestore(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id kategori tidak valid"})
+		return
+	}
+
+	userID := mustUserID(c)
+	var category models.Category
+	if err := config.DB.Unscoped().Where("id = ? AND user_id = ?", id, userID).
+		First(&category).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "kategori tidak ditemukan"})
+		return
+	}
+
+	if err := config.DB.Unscoped().Model(&category).Update("deleted_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "kategori berhasil dipulihkan"})
+}

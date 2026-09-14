@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +29,19 @@ func main() {
 		&models.Transaction{},
 	); err != nil {
 		log.Fatalf("gagal migrasi database: %v", err)
+	}
+
+	// Bootstrap role owner: jika belum ada satupun owner (mis. database lama
+	// yang sudah terisi sebelum fitur role), user pertama di-promosikan.
+	var ownerCount int64
+	config.DB.Model(&models.User{}).Where("role = ?", "owner").Count(&ownerCount)
+	if ownerCount == 0 {
+		var first models.User
+		if err := config.DB.Order("id ASC").First(&first).Error; err == nil {
+			if err := config.DB.Model(&first).Update("role", "owner").Error; err == nil {
+				fmt.Fprintf(os.Stdout, "[cashmate-api]  user #%d (%s) dipromosikan menjadi owner\n", first.ID, first.Email)
+			}
+		}
 	}
 
 	gin.SetMode(gin.ReleaseMode)
