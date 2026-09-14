@@ -88,15 +88,80 @@ berhak dikembalikan sebagai `403`.
 
 ## Migration production
 
-Jalankan pada backup/clone terlebih dahulu:
+Migration di bawah adalah upgrade dari schema lama yang masih memakai
+`wallets.user_id`/`categories.user_id`. Jalankan pada backup/clone terlebih
+dahulu, bukan langsung pada database production.
 
-1. `migrations/001_create_business_tenancy.sql`
-2. `migrations/002_backfill_legacy_business.sql`
-3. Review orphan, owner count, fractional money, dan balance reconciliation.
-4. Migration 002 membuat adjustment transaction eksplisit jika balance lama berbeda dari ledger; hentikan proses bila preflight menemukan pecahan rupiah.
-5. `migrations/003_convert_money_and_constraints.sql`
-6. Deploy API baru dan lakukan smoke test.
-7. Jalankan `migrations/004_remove_legacy_ownership.sql` setelah validasi.
+1. Hentikan API lama atau aktifkan maintenance mode agar tidak ada write saat
+   backfill berjalan.
+2. Buat backup:
+
+```bash
+mysqldump --single-transaction --routines --triggers \
+  -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p \
+  "$DB_NAME" > cashmate-before-tenant-migration-$(date +%Y%m%d-%H%M%S).sql
+```
+
+3. Preflight data lama:
+
+```sql
+SELECT role, COUNT(*) AS total
+FROM users
+WHERE deleted_at IS NULL
+GROUP BY role;
+
+SELECT id, balance
+FROM wallets
+WHERE balance <> TRUNCATE(balance, 0);
+
+SELECT id, amount
+FROM transactions
+WHERE amount <> TRUNCATE(amount, 0);
+```
+
+Hentikan proses jika ada lebih dari satu Owner aktif yang perlu dipetakan atau
+ada nilai pecahan rupiah. Migration `003` sengaja tidak melakukan pembulatan.
+
+4. Jalankan script berurutan dari root repository. `mysql` akan meminta
+   password secara interaktif:
+
+```bash
+mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
+  -u "$DB_USER" -p "$DB_NAME" < migrations/001_create_business_tenancy.sql
+
+mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
+  -u "$DB_USER" -p "$DB_NAME" < migrations/002_backfill_legacy_business.sql
+
+# Review hasil backfill dan rekonsiliasi saldo sebelum lanjut.
+mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
+  -u "$DB_USER" -p "$DB_NAME" < migrations/003_convert_money_and_constraints.sql
+```
+
+Script `002` memetakan data lama ke satu Business `CashMate Legacy`, membuat
+kategori rekonsiliasi, dan menambahkan transaction adjustment jika cached
+balance berbeda dari ledger aktif.
+
+5. Deploy binary/container API baru dengan `AUTO_MIGRATE=false`, lalu lakukan
+   smoke test registration, login, staff, transaction, dashboard, dan tenant
+   isolation.
+6. Setelah smoke test berhasil, hapus kolom ownership lama:
+
+```bash
+mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
+  -u "$DB_USER" -p "$DB_NAME" < migrations/004_remove_legacy_ownership.sql
+```
+
+Migration ini tidak memiliki rollback otomatis. Jika ada kegagalan setelah DDL
+dimulai, hentikan deployment dan restore backup/clone yang dibuat sebelum
+migration. Jangan menjalankan ulang `001` atau `003` secara membabi buta karena
+script versioned tersebut mengharapkan urutan satu kali.
+
+Untuk database development kosong, gunakan `docker-compose.dev.yml`; file itu
+memakai `AUTO_MIGRATE=true` dan tidak boleh diarahkan ke database production:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
 
 ## Test
 
