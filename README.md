@@ -163,6 +163,10 @@ memakai `AUTO_MIGRATE=true` dan tidak boleh diarahkan ke database production:
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
+Deployment VPS memakai `docker-compose.yml` secara eksplisit. Compose production
+hanya menjalankan API, Nginx, dan Certbot; tidak ada service atau image MySQL di
+VPS. Database production tetap memakai server/database eksternal dari `.env`.
+
 ## Test
 
 Unit/route tests tanpa database:

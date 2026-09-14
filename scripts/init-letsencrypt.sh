@@ -35,10 +35,10 @@ fi
 echo "==> Menjalankan container api + nginx..."
 # Production uses the teacher-provided MySQL database; there is intentionally
 # no production `db` service in docker-compose.yml.
-docker compose up -d api nginx
+docker compose -f docker-compose.yml up -d api nginx
 
 echo "==> Mendapatkan sertifikat Let's Encrypt untuk $DOMAIN ..."
-docker compose run --rm --entrypoint certbot certbot certonly \
+docker compose -f docker-compose.yml run --rm --entrypoint certbot certbot certonly \
   --webroot \
   -w /var/www/certbot \
   -d "$DOMAIN" \
@@ -49,7 +49,7 @@ docker compose run --rm --entrypoint certbot certbot certonly \
 
 echo "==> Mengaktifkan konfigurasi HTTPS..."
 sed "s/__DOMAIN__/$DOMAIN/g" nginx/templates/cashmate-ssl.conf.tpl > nginx/conf.d/cashmate-ssl.conf
-docker compose exec nginx nginx -s reload
+docker compose -f docker-compose.yml exec nginx nginx -s reload
 
 echo ""
 echo "Selesai! API sekarang bisa diakses di:"
