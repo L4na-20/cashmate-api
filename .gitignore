@@ -3,6 +3,8 @@
 .env
 .env.*
 !.env.example
+CashMate_BRD_v3.md
+CashMate_PRD_v1.md
 
 # ===== Go build artifacts =====
 cashmate-api
