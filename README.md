@@ -1,187 +1,205 @@
 # CashMate API
 
-REST API CashMate untuk cash management UMKM. API memakai Gin, GORM, MySQL,
-JWT access/refresh token, dan tenant isolation berbasis Business.
+REST API cash management UMKM. Stack: Go, Gin, GORM, MySQL, JWT.
 
-## Development cepat
+## Scope
 
-Prasyarat: Docker Compose.
+- Tenant: `Business` = satu UMKM.
+- User: satu Business, role `OWNER` atau `STAFF`.
+- Currency: `IDR`.
+- Amount/balance: integer rupiah, bukan float.
+- Database production: eksternal, bukan container Docker.
+
+## Jalankan lokal
+
+Prasyarat: Docker Compose dan Go.
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
 curl http://localhost:8096/api/health
 ```
 
-Compose development menjalankan MySQL terisolasi pada port host `3307` dan API
-pada `8096`. Database production tidak pernah dipakai oleh file ini.
+Development memakai MySQL lokal di port `3307` dan API di `8096`.
 
-Untuk menjalankan API di luar Docker:
+Tanpa Docker:
 
 ```bash
 cp .env.development.example .env
 go run .
 ```
 
-`AUTO_MIGRATE=true` hanya untuk database development kosong. Production harus
-menjalankan SQL berurutan di `migrations/` setelah backup dan preflight.
+`AUTO_MIGRATE=true` hanya untuk database development kosong.
 
-## Model tenant
+## Environment
 
-```text
-Business
-├── Owner + Staff
-├── Wallets
-├── Categories
-└── Transactions
+Wajib di production:
+
+```dotenv
+APP_PORT=8096
+APP_TIMEZONE=Asia/Jakarta
+AUTO_MIGRATE=false
+DB_HOST=<external-mysql-host>
+DB_PORT=3306
+DB_USER=<db-user>
+DB_PASSWORD=<db-password>
+DB_NAME=<db-name>
+JWT_SECRET=<random-secret-min-32-chars>
+JWT_REFRESH_SECRET=<different-random-secret>
+CORS_ORIGINS=https://<web-domain>
 ```
 
-Public `POST /api/auth/register` selalu membuat Business baru, Owner, dan wallet
-`Cash` dalam satu database transaction. Staff hanya dibuat oleh Owner melalui
-`POST /api/staff`.
+## Aturan API
 
-Role API adalah `OWNER` dan `STAFF`. Semua resource di-scope dari Business yang
-dimuat server melalui JWT user aktif; `business_id` dari client tidak pernah
-dipakai sebagai otorisasi.
+- `POST /api/auth/register` selalu membuat Business baru, Owner, dan wallet `Cash`.
+- Staff hanya dapat dibuat Owner melalui `/api/staff`.
+- Semua resource otomatis dibatasi ke Business user yang login.
+- `business_id` dari body/query/path tidak digunakan sebagai authorization.
+- Staff tidak dapat membuka dashboard/report, melihat total balance, backdate, edit, atau void transaksi.
+- Staff hanya melihat transaksi miliknya pada hari bisnis saat ini.
+- Wallet balance hanya berubah melalui transaksi; wallet CRUD tidak boleh mengubah balance.
+- Transaksi void tidak masuk dashboard/report.
 
-## Endpoint MVP
+## Endpoint
 
 | Method | Endpoint | Akses |
 |---|---|---|
-| POST | `/api/auth/register` | Public Owner registration |
+| POST | `/api/auth/register` | Public, membuat Owner |
 | POST | `/api/auth/login` | Public |
 | POST | `/api/auth/refresh` | Public |
 | POST | `/api/auth/logout` | Authenticated |
 | GET | `/api/auth/me` | Authenticated |
-| GET/POST/DELETE | `/api/staff[/:id]` | Owner |
+| GET/POST | `/api/staff` | Owner |
+| DELETE | `/api/staff/:id` | Owner |
 | GET | `/api/wallets[/:id]` | Owner/Staff; Staff tanpa balance |
 | POST/PUT/DELETE | `/api/wallets[/:id]` | Owner |
 | POST | `/api/wallets/:id/restore` | Owner |
 | GET | `/api/categories` | Owner/Staff |
 | POST/PUT/DELETE | `/api/categories[/:id]` | Owner |
 | POST | `/api/categories/:id/restore` | Owner |
-| GET/POST | `/api/transactions` | Owner/Staff create; Staff hanya histori sendiri hari ini |
+| GET/POST | `/api/transactions` | Owner/Staff create |
 | PUT/DELETE | `/api/transactions/:id` | Owner |
 | POST | `/api/transactions/:id/restore` | Owner |
 | GET | `/api/dashboard/summary` | Owner |
 | GET | `/api/reports/monthly?year=2026` | Owner |
 
-Success response memakai:
+Semua endpoint selain auth dan health memakai:
 
-```json
-{ "message": "...", "data": {} }
+```http
+Authorization: Bearer <access_token>
 ```
 
-List pagination memakai `data` dan `meta`. Error memakai `message` dan optional
-`errors`. Resource tenant lain dikembalikan sebagai `404`; role yang tidak
-berhak dikembalikan sebagai `403`.
+## Payload utama
 
-## Money, date, dan balance
+Registration:
 
-- Currency MVP selalu `IDR`.
-- Amount dan wallet balance adalah integer whole rupiah (`int64`/`BIGINT`).
-- Wallet balance hanya berubah melalui create/edit/void/restore transaction.
-- Update balance menggunakan atomic SQL expression di dalam DB transaction.
-- Negative balance dipertahankan untuk MVP.
-- Timezone business default `Asia/Jakarta` melalui `APP_TIMEZONE`.
-- Staff tidak dapat mengirim tanggal; server memakai tanggal hari berjalan.
-- Owner dapat mengirim `date` untuk backdate.
+```json
+{
+  "business_name": "Demo Warung",
+  "name": "Owner Demo",
+  "email": "owner@example.com",
+  "password": "password123"
+}
+```
 
-## Migration production
+Transaction:
 
-Migration di bawah adalah upgrade dari schema lama yang masih memakai
-`wallets.user_id`/`categories.user_id`. Jalankan pada backup/clone terlebih
-dahulu, bukan langsung pada database production.
+```json
+{
+  "wallet_id": 1,
+  "category_id": 2,
+  "amount": 25000,
+  "type": "expense",
+  "description": "Pembelian bahan",
+  "date": "2026-09-15"
+}
+```
 
-1. Hentikan API lama atau aktifkan maintenance mode agar tidak ada write saat
-   backfill berjalan.
-2. Buat backup:
+`amount` harus `> 0`. `type` harus `income` atau `expense`. `date` hanya boleh dikirim Owner.
+
+## Response contract
+
+Success:
+
+```json
+{ "message": "...", "data": {}, "meta": {} }
+```
+
+`meta` hanya ada pada response pagination. Error:
+
+```json
+{ "message": "...", "errors": {} }
+```
+
+Cross-tenant resource: `404`. Role tidak diizinkan: `403`.
+
+## Migrasi production
+
+Script berikut meng-upgrade schema lama yang masih memiliki `wallets.user_id` dan `categories.user_id`.
+Jalankan saat API lama dihentikan, pada backup/clone terlebih dahulu.
+
+1. Backup:
 
 ```bash
 mysqldump --single-transaction --routines --triggers \
   -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p \
-  "$DB_NAME" > cashmate-before-tenant-migration-$(date +%Y%m%d-%H%M%S).sql
+  "$DB_NAME" > cashmate-before-migration.sql
 ```
 
-3. Preflight data lama:
+2. Preflight. Hentikan proses jika ada owner aktif yang perlu dipetakan ulang atau nominal pecahan rupiah:
 
 ```sql
-SELECT role, COUNT(*) AS total
-FROM users
-WHERE deleted_at IS NULL
-GROUP BY role;
-
-SELECT id, balance
-FROM wallets
-WHERE balance <> TRUNCATE(balance, 0);
-
-SELECT id, amount
-FROM transactions
-WHERE amount <> TRUNCATE(amount, 0);
+SELECT role, COUNT(*) FROM users WHERE deleted_at IS NULL GROUP BY role;
+SELECT id, balance FROM wallets WHERE balance <> TRUNCATE(balance, 0);
+SELECT id, amount FROM transactions WHERE amount <> TRUNCATE(amount, 0);
 ```
 
-Hentikan proses jika ada lebih dari satu Owner aktif yang perlu dipetakan atau
-ada nilai pecahan rupiah. Migration `003` sengaja tidak melakukan pembulatan.
-
-4. Jalankan script berurutan dari root repository. `mysql` akan meminta
-   password secara interaktif:
+3. Jalankan berurutan:
 
 ```bash
-mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
-  -u "$DB_USER" -p "$DB_NAME" < migrations/001_create_business_tenancy.sql
-
-mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
-  -u "$DB_USER" -p "$DB_NAME" < migrations/002_backfill_legacy_business.sql
-
-# Review hasil backfill dan rekonsiliasi saldo sebelum lanjut.
-mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
-  -u "$DB_USER" -p "$DB_NAME" < migrations/003_convert_money_and_constraints.sql
+mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/001_create_business_tenancy.sql
+mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/002_backfill_legacy_business.sql
+mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/003_convert_money_and_constraints.sql
 ```
 
-Script `002` memetakan data lama ke satu Business `CashMate Legacy`, membuat
-kategori rekonsiliasi, dan menambahkan transaction adjustment jika cached
-balance berbeda dari ledger aktif.
+`002` memetakan data lama ke satu Business `CashMate Legacy` dan membuat adjustment transaction bila cached balance berbeda dari ledger.
 
-5. Deploy binary/container API baru dengan `AUTO_MIGRATE=false`, lalu lakukan
-   smoke test registration, login, staff, transaction, dashboard, dan tenant
-   isolation.
-6. Setelah smoke test berhasil, hapus kolom ownership lama:
+4. Deploy API baru dengan `AUTO_MIGRATE=false`, lalu smoke test registration, login, staff, transaction, dashboard, dan tenant isolation.
+5. Setelah smoke test berhasil, hapus ownership lama:
 
 ```bash
-mysql --protocol=tcp -h "$DB_HOST" -P "${DB_PORT:-3306}" \
-  -u "$DB_USER" -p "$DB_NAME" < migrations/004_remove_legacy_ownership.sql
+mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/004_remove_legacy_ownership.sql
 ```
 
-Migration ini tidak memiliki rollback otomatis. Jika ada kegagalan setelah DDL
-dimulai, hentikan deployment dan restore backup/clone yang dibuat sebelum
-migration. Jangan menjalankan ulang `001` atau `003` secara membabi buta karena
-script versioned tersebut mengharapkan urutan satu kali.
+Migration tidak memiliki down script. Rollback dilakukan dengan restore backup. Jangan menjalankan migration versioned ulang tanpa memeriksa schema.
 
-Untuk database development kosong, gunakan `docker-compose.dev.yml`; file itu
-memakai `AUTO_MIGRATE=true` dan tidak boleh diarahkan ke database production:
+## Deploy VPS
+
+`docker-compose.yml` production hanya menjalankan API, Nginx, dan Certbot. Tidak ada image/service MySQL.
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d --build
+./scripts/deploy.sh
 ```
 
-Deployment VPS memakai `docker-compose.yml` secara eksplisit. Compose production
-hanya menjalankan API, Nginx, dan Certbot; tidak ada service atau image MySQL di
-VPS. Database production tetap memakai server/database eksternal dari `.env`.
+Pastikan `.env` production sudah ada dan `AUTO_MIGRATE=false`.
 
 ## Test
 
-Unit/route tests tanpa database:
-
 ```bash
-GOCACHE=/tmp/cashmate-go-build go test ./...
-GOCACHE=/tmp/cashmate-go-build go vet ./...
+go test ./...
+go vet ./...
 ```
 
-Integration test membutuhkan database dengan nama yang mengandung `_test`:
+Integration test membutuhkan database lokal dengan nama mengandung `_test`:
 
 ```bash
 CASHMATE_TEST_DSN='cashmate:cashmate@tcp(127.0.0.1:3307)/cashmate_test?charset=utf8mb4&parseTime=True&loc=Asia%2FJakarta' \
-GOCACHE=/tmp/cashmate-go-build go test ./integration -v
+  go test ./integration -v
 ```
 
-Integration flow menguji dua Business, IDOR, Staff RBAC, Staff daily history,
-Owner visibility, edit/void, dan balance consistency.
+Postman collection tunggal:
+
+`postman/cashmate_postman_collection.json`
