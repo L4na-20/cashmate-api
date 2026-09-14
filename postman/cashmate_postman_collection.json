@@ -1,46 +1,785 @@
 {
   "info": {
     "name": "CashMate API MVP",
+    "description": "Tenant-aware Owner/Staff API flow. Run requests in folder order from top to bottom.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "base_url", "value": "http://localhost:8096/api" },
+    { "key": "owner_email", "value": "" },
+    { "key": "owner_password", "value": "password123" },
+    { "key": "staff_email", "value": "" },
+    { "key": "staff_password", "value": "password123" },
+    { "key": "other_owner_email", "value": "" },
+    { "key": "other_owner_password", "value": "password123" },
     { "key": "access_token", "value": "" },
-    { "key": "refresh_token", "value": "" }
+    { "key": "refresh_token", "value": "" },
+    { "key": "staff_access_token", "value": "" },
+    { "key": "staff_refresh_token", "value": "" },
+    { "key": "other_access_token", "value": "" },
+    { "key": "business_id", "value": "" },
+    { "key": "owner_id", "value": "" },
+    { "key": "staff_id", "value": "" },
+    { "key": "wallet_id", "value": "" },
+    { "key": "other_wallet_id", "value": "" },
+    { "key": "income_category_id", "value": "" },
+    { "key": "expense_category_id", "value": "" },
+    { "key": "owner_transaction_id", "value": "" },
+    { "key": "staff_transaction_id", "value": "" },
+    { "key": "report_year", "value": "2026" }
   ],
   "item": [
     {
-      "name": "Health",
-      "request": {
-        "method": "GET",
-        "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
-      }
+      "name": "01 - Health & Auth",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          }
+        },
+        {
+          "name": "Register Owner + Business",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('owner_email', 'owner-' + Date.now() + '@example.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('registration succeeds', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('owner_id', json.data.user.id);",
+                  "pm.collectionVariables.set('business_id', json.data.business.id);",
+                  "pm.expect(json.data.user.role).to.eql('OWNER');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_name\": \"Demo Warung\",\n  \"name\": \"Owner Demo\",\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/register"
+          }
+        },
+        {
+          "name": "Login Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('owner login succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.collectionVariables.set('access_token', json.data.access_token);",
+                  "pm.collectionVariables.set('refresh_token', json.data.refresh_token);",
+                  "pm.collectionVariables.set('owner_id', json.data.user.id);",
+                  "pm.collectionVariables.set('business_id', json.data.business.id);",
+                  "pm.expect(json.data.user.role).to.eql('OWNER');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "Refresh Owner Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('refresh succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.collectionVariables.set('access_token', json.data.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Current User / Business",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/me"
+          }
+        }
+      ]
     },
     {
-      "name": "Register Owner",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"business_name\": \"Demo Warung\",\n  \"name\": \"Owner Demo\",\n  \"email\": \"owner@example.test\",\n  \"password\": \"password123\"\n}" },
-        "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
-      }
+      "name": "02 - Owner Setup",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Create Staff",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('staff_email', 'staff-' + Date.now() + '@example.test');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('staff created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('staff_id', json.data.id);",
+                  "pm.expect(json.data.role).to.eql('STAFF');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Staff Demo\",\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}"
+            },
+            "url": "{{base_url}}/staff"
+          }
+        },
+        {
+          "name": "List Staff",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/staff?status=active"
+          }
+        },
+        {
+          "name": "Create Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('wallet created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('wallet_id', json.data.id);",
+                  "pm.expect(json.data.currency).to.eql('IDR');",
+                  "pm.expect(json.data.balance).to.eql(0);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kas Operasional\"\n}"
+            },
+            "url": "{{base_url}}/wallets"
+          }
+        },
+        {
+          "name": "List Wallets",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/wallets?status=active"
+          }
+        },
+        {
+          "name": "Update Wallet Metadata",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kas Operasional Updated\",\n  \"currency\": \"IDR\"\n}"
+            },
+            "url": "{{base_url}}/wallets/{{wallet_id}}"
+          }
+        },
+        {
+          "name": "Create Income Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('income category created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('income_category_id', json.data.id);",
+                  "pm.expect(json.data.type).to.eql('income');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Penjualan\",\n  \"type\": \"income\"\n}"
+            },
+            "url": "{{base_url}}/categories"
+          }
+        },
+        {
+          "name": "Create Expense Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('expense category created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('expense_category_id', json.data.id);",
+                  "pm.expect(json.data.type).to.eql('expense');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Operasional\",\n  \"type\": \"expense\"\n}"
+            },
+            "url": "{{base_url}}/categories"
+          }
+        },
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/categories?status=active"
+          }
+        }
+      ]
     },
     {
-      "name": "Login",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": { "mode": "raw", "raw": "{\n  \"email\": \"owner@example.test\",\n  \"password\": \"password123\"\n}" },
-        "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
-      }
+      "name": "03 - Staff Mobile Flow",
+      "item": [
+        {
+          "name": "Login Staff",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('staff login succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.collectionVariables.set('staff_access_token', json.data.access_token);",
+                  "pm.collectionVariables.set('staff_refresh_token', json.data.refresh_token);",
+                  "pm.expect(json.data.user.role).to.eql('STAFF');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "Staff Active Wallets (balance hidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('staff wallet list succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "if (json.data.length > 0) pm.expect(json.data[0]).to.not.have.property('balance');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "url": "{{base_url}}/wallets"
+          }
+        },
+        {
+          "name": "Staff Active Categories",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "url": "{{base_url}}/categories"
+          }
+        },
+        {
+          "name": "Staff Create Expense (server date)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('staff transaction created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('staff_transaction_id', json.data.id);",
+                  "pm.expect(json.data.type).to.eql('expense');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staff_access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 25000,\n  \"type\": \"expense\",\n  \"description\": \"Pembelian bahan\"\n}"
+            },
+            "url": "{{base_url}}/transactions"
+          }
+        },
+        {
+          "name": "Staff Own History (date filter cannot bypass today rule)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('staff history succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.expect(json.meta.total).to.be.at.least(1);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "url": "{{base_url}}/transactions?from_date=2020-01-01&to_date=2020-01-02&page=1&per_page=15"
+          }
+        },
+        {
+          "name": "Staff Dashboard Forbidden",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('staff dashboard is forbidden', function () { pm.expect(pm.response.code).to.eql(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "url": "{{base_url}}/dashboard/summary"
+          }
+        },
+        {
+          "name": "Staff Edit Transaction Forbidden",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('staff edit is forbidden', function () { pm.expect(pm.response.code).to.eql(403); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{staff_access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 100,\n  \"type\": \"expense\"\n}"
+            },
+            "url": "{{base_url}}/transactions/{{staff_transaction_id}}"
+          }
+        },
+        {
+          "name": "Logout Staff",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "url": "{{base_url}}/auth/logout"
+          }
+        }
+      ]
     },
     {
-      "name": "Owner Dashboard",
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
-        "url": { "raw": "{{base_url}}/dashboard/summary", "host": ["{{base_url}}"], "path": ["dashboard", "summary"] }
-      }
+      "name": "04 - Owner Transactions & Reports",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Create Backdated Income",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{income_category_id}},\n  \"amount\": 100000,\n  \"type\": \"income\",\n  \"description\": \"Penjualan tunai\",\n  \"date\": \"2026-01-15\"\n}"
+            },
+            "url": "{{base_url}}/transactions"
+          }
+        },
+        {
+          "name": "Create Owner Expense",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('owner transaction created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('owner_transaction_id', json.data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 15000,\n  \"type\": \"expense\",\n  \"description\": \"Biaya operasional\"\n}"
+            },
+            "url": "{{base_url}}/transactions"
+          }
+        },
+        {
+          "name": "Owner Transaction History with Filters",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/transactions?wallet_id={{wallet_id}}&category_id={{expense_category_id}}&creator_id={{staff_id}}&type=expense&from_date=2020-01-01&to_date=2030-12-31&page=1&per_page=15"
+          }
+        },
+        {
+          "name": "Owner Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('dashboard succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.expect(json.data).to.have.property('total_balance');",
+                  "pm.expect(json.data).to.have.property('current_month_income');",
+                  "pm.expect(json.data).to.have.property('current_month_expense');",
+                  "pm.expect(json.data).to.have.property('net_cashflow');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/dashboard/summary"
+          }
+        },
+        {
+          "name": "Monthly Report",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('report_year', String(new Date().getFullYear()));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('monthly report succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.expect(json.data).to.have.lengthOf(12);",
+                  "pm.expect(json.data[0]).to.have.property('net_cashflow');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/reports/monthly?year={{report_year}}"
+          }
+        },
+        {
+          "name": "Edit Owner Transaction",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 10000,\n  \"type\": \"expense\",\n  \"description\": \"Biaya operasional dikoreksi\"\n}"
+            },
+            "url": "{{base_url}}/transactions/{{owner_transaction_id}}"
+          }
+        },
+        {
+          "name": "Void Owner Transaction",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/transactions/{{owner_transaction_id}}"
+          }
+        },
+        {
+          "name": "Restore Owner Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/transactions/{{owner_transaction_id}}/restore"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Tenant Isolation",
+      "item": [
+        {
+          "name": "Register Other Business Owner",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('other_owner_email', 'other-owner-' + Date.now() + '@example.test');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_name\": \"Business B\",\n  \"name\": \"Owner B\",\n  \"email\": \"{{other_owner_email}}\",\n  \"password\": \"{{other_owner_password}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/register"
+          }
+        },
+        {
+          "name": "Login Other Business Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('other owner login succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.collectionVariables.set('other_access_token', json.data.access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{other_owner_email}}\",\n  \"password\": \"{{other_owner_password}}\"\n}"
+            },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "List Business B Wallets",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Business B wallet list succeeds', function () { pm.expect(pm.response.code).to.eql(200); });",
+                  "pm.collectionVariables.set('other_wallet_id', json.data[0].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{other_access_token}}" }],
+            "url": "{{base_url}}/wallets"
+          }
+        },
+        {
+          "name": "Owner A Cannot Read Business B Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('cross-tenant wallet is hidden', function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/wallets/{{other_wallet_id}}"
+          }
+        },
+        {
+          "name": "Business B Cannot Read Business A Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('reverse cross-tenant wallet is hidden', function () { pm.expect(pm.response.code).to.eql(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{other_access_token}}" }],
+            "url": "{{base_url}}/wallets/{{wallet_id}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Owner Resource Lifecycle",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Disable Wallet",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/wallets/{{wallet_id}}"
+          }
+        },
+        {
+          "name": "Restore Wallet",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/wallets/{{wallet_id}}/restore"
+          }
+        },
+        {
+          "name": "Disable Expense Category",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/categories/{{expense_category_id}}"
+          }
+        },
+        {
+          "name": "Restore Expense Category",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/categories/{{expense_category_id}}/restore"
+          }
+        },
+        {
+          "name": "Disable Staff",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/staff/{{staff_id}}"
+          }
+        },
+        {
+          "name": "List Disabled Wallets",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/wallets?status=disabled"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Owner Logout",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Logout Owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('owner logout succeeds', function () { pm.expect(pm.response.code).to.eql(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/auth/logout"
+          }
+        }
+      ]
     }
   ]
 }
