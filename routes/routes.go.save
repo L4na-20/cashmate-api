@@ -5,6 +5,7 @@ import (
 
 	"cashmate-api/controllers"
 	"cashmate-api/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,9 +16,7 @@ func Setup(r *gin.Engine) {
 	api := r.Group("/api")
 	api.Use(middleware.CORS())
 
-	api.OPTIONS("/*path", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
+
 
 	api.Use(middleware.RateLimitGeneral())
 
