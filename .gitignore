@@ -15,6 +15,7 @@ cashmate-api
 *.out
 bin/
 coverage/
+migrations/
 
 # ===== IDE & Editor =====
 .idea/
@@ -27,6 +28,9 @@ Thumbs.db
 # ===== Logs =====
 *.log
 logs/
+
+# ===== File upload runtime =====
+uploads/
 
 
 cashmate.json

@@ -22,10 +22,11 @@ type Transaction struct {
 	UpdatedByUserID *uint          `gorm:"index" json:"updated_by_user_id,omitempty"`
 	DeletedByUserID *uint          `gorm:"index" json:"deleted_by_user_id,omitempty"`
 
-	Business  *Business `gorm:"foreignKey:BusinessID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
-	Wallet    *Wallet   `gorm:"foreignKey:WalletID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"wallet,omitempty"`
-	Category  *Category `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"category,omitempty"`
-	CreatedBy *User     `gorm:"foreignKey:CreatedByUserID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"created_by,omitempty"`
-	UpdatedBy *User     `gorm:"foreignKey:UpdatedByUserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"-"`
-	DeletedBy *User     `gorm:"foreignKey:DeletedByUserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"-"`
+	Business  *Business          `gorm:"foreignKey:BusinessID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"-"`
+	Wallet    *Wallet            `gorm:"foreignKey:WalletID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"wallet,omitempty"`
+	Category  *Category          `gorm:"foreignKey:CategoryID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"category,omitempty"`
+	CreatedBy *User              `gorm:"foreignKey:CreatedByUserID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"created_by,omitempty"`
+	Photos    []TransactionPhoto `gorm:"foreignKey:TransactionID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"photos,omitempty"`
+	UpdatedBy *User              `gorm:"foreignKey:UpdatedByUserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"-"`
+	DeletedBy *User              `gorm:"foreignKey:DeletedByUserID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"-"`
 }

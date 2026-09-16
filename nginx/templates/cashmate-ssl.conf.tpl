@@ -6,6 +6,9 @@ server {
     http2 on;
     server_name __DOMAIN__;
 
+    # Izinkan upload foto transaksi / foto profil (sesuaikan dengan UPLOAD_MAX_SIZE_MB).
+    client_max_body_size 10m;
+
     ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
     ssl_protocols       TLSv1.2 TLSv1.3;

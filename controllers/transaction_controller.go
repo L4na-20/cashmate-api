@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,10 +13,13 @@ import (
 	"cashmate-api/helpers"
 	"cashmate-api/models"
 	"cashmate-api/services"
+	"cashmate-api/storage"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+const maxPhotosPerTransaction = 10
 
 type transactionInput struct {
 	WalletID    uint   `json:"wallet_id"`
@@ -77,11 +82,17 @@ func transactionView(transaction models.Transaction, revealBalance bool) gin.H {
 	}
 	if transaction.CreatedBy != nil {
 		result["created_by"] = gin.H{
-			"id":   transaction.CreatedBy.ID,
-			"name": transaction.CreatedBy.Name,
-			"role": models.NormalizeRole(transaction.CreatedBy.Role),
+			"id":            transaction.CreatedBy.ID,
+			"name":          transaction.CreatedBy.Name,
+			"role":          models.NormalizeRole(transaction.CreatedBy.Role),
+			"profile_photo": transaction.CreatedBy.ProfilePhoto,
 		}
 	}
+	photos := make([]gin.H, 0, len(transaction.Photos))
+	for _, photo := range transaction.Photos {
+		photos = append(photos, gin.H{"id": photo.ID, "url": photo.URL})
+	}
+	result["photos"] = photos
 	return result
 }
 
@@ -89,7 +100,88 @@ func preloadTransaction(query *gorm.DB) *gorm.DB {
 	return query.
 		Preload("Wallet", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
 		Preload("Category", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
-		Preload("CreatedBy", func(db *gorm.DB) *gorm.DB { return db.Unscoped() })
+		Preload("CreatedBy", func(db *gorm.DB) *gorm.DB { return db.Unscoped() }).
+		Preload("Photos")
+}
+
+// bindTransactionPayload menerima payload JSON (legacy) maupun
+// multipart/form-data. Multipart memungkinkan field dan file foto sekaligus.
+func bindTransactionPayload(c *gin.Context) (transactionInput, []*multipart.FileHeader, error) {
+	if strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data") {
+		var input transactionInput
+		var err error
+		if input.WalletID, err = parseUintForm(c.PostForm("wallet_id")); err != nil {
+			return input, nil, err
+		}
+		if input.CategoryID, err = parseUintForm(c.PostForm("category_id")); err != nil {
+			return input, nil, err
+		}
+		if input.Amount, err = parseAmountForm(c.PostForm("amount")); err != nil {
+			return input, nil, err
+		}
+		input.Type = c.PostForm("type")
+		input.Description = c.PostForm("description")
+		input.Date = c.PostForm("date")
+
+		form, err := c.MultipartForm()
+		if err != nil {
+			return input, nil, err
+		}
+		photos := form.File["photos"]
+		if len(photos) > maxPhotosPerTransaction {
+			return input, nil, fmt.Errorf("maksimal %d foto per transaksi", maxPhotosPerTransaction)
+		}
+		return input, photos, nil
+	}
+
+	var input transactionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		return input, nil, err
+	}
+	return input, nil, nil
+}
+
+func parseUintForm(value string) (uint, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseUint(value, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint(parsed), nil
+}
+
+func parseAmountForm(value string) (int64, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, nil
+	}
+	return strconv.ParseInt(value, 10, 64)
+}
+
+func saveTransactionPhotos(c *gin.Context, headers []*multipart.FileHeader) ([]string, error) {
+	if len(headers) == 0 {
+		return nil, nil
+	}
+	subDir := fmt.Sprintf("transactions/%d", currentBusinessID(c))
+	urls := make([]string, 0, len(headers))
+	for _, header := range headers {
+		url, err := storage.SaveImage(header, subDir)
+		if err != nil {
+			removePhotos(urls)
+			return nil, err
+		}
+		urls = append(urls, url)
+	}
+	return urls, nil
+}
+
+func removePhotos(urls []string) {
+	for _, url := range urls {
+		storage.RemoveImage(url)
+	}
 }
 
 func parseDate(value string) (time.Time, error) {
@@ -228,8 +320,8 @@ func TransactionsIndex(c *gin.Context) {
 }
 
 func TransactionsStore(c *gin.Context) {
-	var input transactionInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	input, photoHeaders, err := bindTransactionPayload(c)
+	if err != nil {
 		helpers.Error(c, http.StatusBadRequest, "payload transaksi tidak valid", nil)
 		return
 	}
@@ -244,6 +336,11 @@ func TransactionsStore(c *gin.Context) {
 	date, err := transactionDate(input.Date, todayDate())
 	if err != nil {
 		helpers.Error(c, http.StatusBadRequest, "date harus YYYY-MM-DD", nil)
+		return
+	}
+	photoURLs, err := saveTransactionPhotos(c, photoHeaders)
+	if err != nil {
+		helpers.Error(c, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 	transaction := models.Transaction{
@@ -263,13 +360,20 @@ func TransactionsStore(c *gin.Context) {
 		if err := tx.Create(&transaction).Error; err != nil {
 			return err
 		}
+		for _, url := range photoURLs {
+			if err := tx.Create(&models.TransactionPhoto{TransactionID: transaction.ID, URL: url}).Error; err != nil {
+				return err
+			}
+		}
 		return services.ApplyWalletDelta(tx, transaction.BusinessID, transaction.WalletID, services.Delta(transaction), false)
 	})
 	if errors.Is(err, services.ErrResourceUnavailable) {
+		removePhotos(photoURLs)
 		helpers.Error(c, http.StatusUnprocessableEntity, "wallet atau kategori tidak tersedia untuk transaksi", nil)
 		return
 	}
 	if err != nil {
+		removePhotos(photoURLs)
 		helpers.Error(c, http.StatusInternalServerError, "gagal menyimpan transaksi", nil)
 		return
 	}
@@ -289,13 +393,18 @@ func TransactionsUpdate(c *gin.Context) {
 		helpers.Error(c, http.StatusBadRequest, "id transaksi tidak valid", nil)
 		return
 	}
-	var input transactionInput
-	if err := c.ShouldBindJSON(&input); err != nil {
+	input, photoHeaders, err := bindTransactionPayload(c)
+	if err != nil {
 		helpers.Error(c, http.StatusBadRequest, "payload transaksi tidak valid", nil)
 		return
 	}
 	if msg := validateTransactionInput(&input); msg != "" {
 		helpers.Error(c, http.StatusBadRequest, msg, nil)
+		return
+	}
+	photoURLs, err := saveTransactionPhotos(c, photoHeaders)
+	if err != nil {
+		helpers.Error(c, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 	var updated models.Transaction
@@ -327,6 +436,11 @@ func TransactionsUpdate(c *gin.Context) {
 		if err := tx.Model(&existing).Updates(updates).Error; err != nil {
 			return err
 		}
+		for _, url := range photoURLs {
+			if err := tx.Create(&models.TransactionPhoto{TransactionID: existing.ID, URL: url}).Error; err != nil {
+				return err
+			}
+		}
 		if err := services.ApplyWalletDelta(tx, existing.BusinessID, input.WalletID, services.Delta(models.Transaction{Amount: input.Amount, Type: input.Type}), false); err != nil {
 			return err
 		}
@@ -335,6 +449,9 @@ func TransactionsUpdate(c *gin.Context) {
 		updated.Description, updated.Date, updated.UpdatedByUserID = input.Description, date, &userID
 		return nil
 	})
+	if err != nil {
+		removePhotos(photoURLs)
+	}
 	if errors.Is(err, services.ErrTransactionNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
 		helpers.Error(c, http.StatusNotFound, "transaksi tidak ditemukan", nil)
 		return
@@ -427,4 +544,43 @@ func TransactionsRestore(c *gin.Context) {
 	}
 	restored = loadTransaction(restored.ID)
 	helpers.Success(c, http.StatusOK, "transaksi berhasil dipulihkan", transactionView(restored, true))
+}
+
+// TransactionPhotoDestroy menghapus satu foto bukti milik transaksi yang
+// berada di Business user. File di disk dihapus setelah baris DB terhapus.
+func TransactionPhotoDestroy(c *gin.Context) {
+	transactionID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || transactionID == 0 {
+		helpers.Error(c, http.StatusBadRequest, "id transaksi tidak valid", nil)
+		return
+	}
+	photoID, err := strconv.ParseUint(c.Param("photo_id"), 10, 64)
+	if err != nil || photoID == 0 {
+		helpers.Error(c, http.StatusBadRequest, "id foto tidak valid", nil)
+		return
+	}
+
+	var removedURL string
+	err = config.DB.Transaction(func(tx *gorm.DB) error {
+		var transaction models.Transaction
+		if err := tx.Where("id = ? AND business_id = ?", transactionID, currentBusinessID(c)).First(&transaction).Error; err != nil {
+			return services.ErrTransactionNotFound
+		}
+		var photo models.TransactionPhoto
+		if err := tx.Where("id = ? AND transaction_id = ?", photoID, transaction.ID).First(&photo).Error; err != nil {
+			return services.ErrPhotoNotFound
+		}
+		removedURL = photo.URL
+		return tx.Delete(&photo).Error
+	})
+	if errors.Is(err, services.ErrTransactionNotFound) || errors.Is(err, services.ErrPhotoNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
+		helpers.Error(c, http.StatusNotFound, "foto transaksi tidak ditemukan", nil)
+		return
+	}
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "gagal menghapus foto transaksi", nil)
+		return
+	}
+	storage.RemoveImage(removedURL)
+	helpers.Success(c, http.StatusOK, "foto transaksi berhasil dihapus", nil)
 }

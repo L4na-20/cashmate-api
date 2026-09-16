@@ -5,28 +5,98 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:8096/api" },
-    { "key": "owner_email", "value": "" },
-    { "key": "owner_password", "value": "password123" },
-    { "key": "staff_email", "value": "" },
-    { "key": "staff_password", "value": "password123" },
-    { "key": "other_owner_email", "value": "" },
-    { "key": "other_owner_password", "value": "password123" },
-    { "key": "access_token", "value": "" },
-    { "key": "refresh_token", "value": "" },
-    { "key": "staff_access_token", "value": "" },
-    { "key": "staff_refresh_token", "value": "" },
-    { "key": "other_access_token", "value": "" },
-    { "key": "business_id", "value": "" },
-    { "key": "owner_id", "value": "" },
-    { "key": "staff_id", "value": "" },
-    { "key": "wallet_id", "value": "" },
-    { "key": "other_wallet_id", "value": "" },
-    { "key": "income_category_id", "value": "" },
-    { "key": "expense_category_id", "value": "" },
-    { "key": "owner_transaction_id", "value": "" },
-    { "key": "staff_transaction_id", "value": "" },
-    { "key": "report_year", "value": "2026" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:8096/api"
+    },
+    {
+      "key": "owner_email",
+      "value": ""
+    },
+    {
+      "key": "owner_password",
+      "value": "password123"
+    },
+    {
+      "key": "staff_email",
+      "value": ""
+    },
+    {
+      "key": "staff_password",
+      "value": "password123"
+    },
+    {
+      "key": "other_owner_email",
+      "value": ""
+    },
+    {
+      "key": "other_owner_password",
+      "value": "password123"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "staff_access_token",
+      "value": ""
+    },
+    {
+      "key": "staff_refresh_token",
+      "value": ""
+    },
+    {
+      "key": "other_access_token",
+      "value": ""
+    },
+    {
+      "key": "business_id",
+      "value": ""
+    },
+    {
+      "key": "owner_id",
+      "value": ""
+    },
+    {
+      "key": "staff_id",
+      "value": ""
+    },
+    {
+      "key": "wallet_id",
+      "value": ""
+    },
+    {
+      "key": "other_wallet_id",
+      "value": ""
+    },
+    {
+      "key": "income_category_id",
+      "value": ""
+    },
+    {
+      "key": "expense_category_id",
+      "value": ""
+    },
+    {
+      "key": "owner_transaction_id",
+      "value": ""
+    },
+    {
+      "key": "transaction_photo_id",
+      "value": ""
+    },
+    {
+      "key": "staff_transaction_id",
+      "value": ""
+    },
+    {
+      "key": "report_year",
+      "value": "2026"
+    }
   ],
   "item": [
     {
@@ -37,7 +107,28 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/health"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/health"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"cashmate-api\"\n}"
+            }
+          ]
         },
         {
           "name": "Register Owner + Business",
@@ -67,13 +158,48 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"business_name\": \"Demo Warung\",\n  \"name\": \"Owner Demo\",\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
             },
             "url": "{{base_url}}/auth/register"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/auth/register",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"business_name\": \"Demo Warung\",\n  \"name\": \"Owner Demo\",\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"registrasi berhasil\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Owner Demo\",\n      \"email\": \"owner@example.com\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    },\n    \"business\": {\n      \"id\": 1,\n      \"name\": \"Demo Warung\"\n    }\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Login Owner",
@@ -96,13 +222,48 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
             },
             "url": "{{base_url}}/auth/login"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/auth/login",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{owner_email}}\",\n  \"password\": \"{{owner_password}}\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"login berhasil\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Owner Demo\",\n      \"email\": \"owner@example.com\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    },\n    \"business\": {\n      \"id\": 1,\n      \"name\": \"Demo Warung\"\n    },\n    \"access_token\": \"<access_token>\",\n    \"refresh_token\": \"<refresh_token>\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Refresh Owner Access Token",
@@ -121,21 +282,146 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
             },
             "url": "{{base_url}}/auth/refresh"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/auth/refresh",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"token berhasil diperbarui\",\n  \"data\": {\n    \"access_token\": \"<access_token_baru>\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Current User / Business",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
             "url": "{{base_url}}/auth/me"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/auth/me"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"sesi aktif\",\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Owner Demo\",\n      \"email\": \"owner@example.com\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    },\n    \"business\": {\n      \"id\": 1,\n      \"name\": \"Demo Warung\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Upload Profile Photo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{base_url}}/auth/me/photo"
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/auth/me/photo",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "photo",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"foto profil berhasil diperbarui\",\n  \"data\": {\n    \"id\": 1,\n    \"business_id\": 1,\n    \"name\": \"Owner Demo\",\n    \"email\": \"owner@example.com\",\n    \"role\": \"OWNER\",\n    \"profile_photo\": \"/uploads/avatars/1/ab12cd34.jpg\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -143,7 +429,13 @@
       "name": "02 - Owner Setup",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
@@ -173,20 +465,76 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Staff Demo\",\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}"
             },
             "url": "{{base_url}}/staff"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/staff",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Staff Demo\",\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Staff berhasil dibuat\",\n  \"data\": {\n    \"id\": 2,\n    \"business_id\": 1,\n    \"name\": \"Staff A\",\n    \"email\": \"staff@example.com\",\n    \"role\": \"STAFF\",\n    \"profile_photo\": \"\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Staff",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/staff?status=active"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/staff?status=active"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Staff berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Staff A\",\n      \"email\": \"staff@example.com\",\n      \"role\": \"STAFF\",\n      \"profile_photo\": \"\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Create Wallet",
@@ -207,32 +555,123 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Kas Operasional\"\n}"
             },
             "url": "{{base_url}}/wallets"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/wallets",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Kas Operasional\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil dibuat\",\n  \"data\": {\n    \"id\": 1,\n    \"business_id\": 1,\n    \"name\": \"Cash\",\n    \"balance\": 0,\n    \"currency\": \"IDR\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Wallets",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/wallets?status=active"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/wallets?status=active"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"balance\": 185000,\n      \"currency\": \"IDR\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Update Wallet Metadata",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Kas Operasional Updated\",\n  \"currency\": \"IDR\"\n}"
             },
             "url": "{{base_url}}/wallets/{{wallet_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/wallets/{{wallet_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Kas Operasional Updated\",\n  \"currency\": \"IDR\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil diperbarui\",\n  \"data\": {\n    \"id\": 1,\n    \"business_id\": 1,\n    \"name\": \"Kas Tunai\",\n    \"balance\": 185000,\n    \"currency\": \"IDR\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create Income Category",
@@ -252,13 +691,48 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Penjualan\",\n  \"type\": \"income\"\n}"
             },
             "url": "{{base_url}}/categories"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/categories",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Penjualan\",\n  \"type\": \"income\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"kategori berhasil dibuat\",\n  \"data\": {\n    \"id\": 1,\n    \"business_id\": 1,\n    \"name\": \"Penjualan\",\n    \"type\": \"income\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create Expense Category",
@@ -278,20 +752,76 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Operasional\",\n  \"type\": \"expense\"\n}"
             },
             "url": "{{base_url}}/categories"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/categories",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Operasional\",\n  \"type\": \"expense\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"kategori berhasil dibuat\",\n  \"data\": {\n    \"id\": 2,\n    \"business_id\": 1,\n    \"name\": \"Pembelian\",\n    \"type\": \"expense\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Categories",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/categories?status=active"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/categories?status=active"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"kategori berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Penjualan\",\n      \"type\": \"income\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null\n    },\n    {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
@@ -317,13 +847,48 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}"
             },
             "url": "{{base_url}}/auth/login"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/auth/login",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{staff_email}}\",\n  \"password\": \"{{staff_password}}\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"login berhasil\",\n  \"data\": {\n    \"user\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Staff A\",\n      \"email\": \"staff@example.com\",\n      \"role\": \"STAFF\",\n      \"profile_photo\": \"/uploads/avatars/2/ab12cd34.jpg\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    },\n    \"business\": {\n      \"id\": 1,\n      \"name\": \"Demo Warung\"\n    },\n    \"access_token\": \"<access_token_staff>\",\n    \"refresh_token\": \"<refresh_token_staff>\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Staff Active Wallets (balance hidden)",
@@ -342,17 +907,79 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/wallets"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/wallets"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Staff Active Categories",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/categories"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/categories"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"kategori berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Penjualan\",\n      \"type\": \"income\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null\n    },\n    {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Staff Create Expense (server date)",
@@ -373,15 +1000,55 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{staff_access_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 25000,\n  \"type\": \"expense\",\n  \"description\": \"Pembelian bahan\"\n}"
             },
             "url": "{{base_url}}/transactions"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/transactions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 25000,\n  \"type\": \"expense\",\n  \"description\": \"Pembelian bahan\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil disimpan\",\n  \"data\": {\n    \"id\": 4,\n    \"business_id\": 1,\n    \"wallet_id\": 1,\n    \"category_id\": 2,\n    \"created_by_user_id\": 2,\n    \"amount\": 15000,\n    \"type\": \"expense\",\n    \"description\": \"Biaya operasional\",\n    \"date\": \"2026-09-16\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null,\n    \"wallet\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\"\n    },\n    \"category\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\"\n    },\n    \"created_by\": {\n      \"id\": 2,\n      \"name\": \"Staff A\",\n      \"role\": \"STAFF\",\n      \"profile_photo\": \"/uploads/avatars/2/ab12cd34.jpg\"\n    },\n    \"photos\": []\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Staff Own History (date filter cannot bypass today rule)",
@@ -400,9 +1067,40 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/transactions?from_date=2020-01-01&to_date=2020-01-02&page=1&per_page=15"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/transactions?from_date=2020-01-01&to_date=2020-01-02&page=1&per_page=15"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 4,\n      \"business_id\": 1,\n      \"wallet_id\": 1,\n      \"category_id\": 2,\n      \"created_by_user_id\": 2,\n      \"amount\": 15000,\n      \"type\": \"expense\",\n      \"description\": \"Biaya operasional\",\n      \"date\": \"2026-09-16\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null,\n      \"wallet\": {\n        \"id\": 1,\n        \"business_id\": 1,\n        \"name\": \"Cash\",\n        \"currency\": \"IDR\"\n      },\n      \"category\": {\n        \"id\": 2,\n        \"business_id\": 1,\n        \"name\": \"Pembelian\",\n        \"type\": \"expense\"\n      },\n      \"created_by\": {\n        \"id\": 2,\n        \"name\": \"Staff A\",\n        \"role\": \"STAFF\",\n        \"profile_photo\": \"/uploads/avatars/2/ab12cd34.jpg\"\n      },\n      \"photos\": []\n    }\n  ],\n  \"meta\": {\n    \"current_page\": 1,\n    \"per_page\": 15,\n    \"total\": 1,\n    \"last_page\": 1,\n    \"from\": 1,\n    \"to\": 1\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Staff Dashboard Forbidden",
@@ -419,9 +1117,40 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/dashboard/summary"
-          }
+          },
+          "response": [
+            {
+              "name": "Error 403",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/dashboard/summary"
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"dashboard hanya tersedia untuk Owner\"\n}"
+            }
+          ]
         },
         {
           "name": "Staff Edit Transaction Forbidden",
@@ -439,23 +1168,94 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{staff_access_token}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 100,\n  \"type\": \"expense\"\n}"
             },
             "url": "{{base_url}}/transactions/{{staff_transaction_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Error 403",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/transactions/{{staff_transaction_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 100,\n  \"type\": \"expense\"\n}"
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"akses ditolak: hanya Owner yang diizinkan\"\n}"
+            }
+          ]
         },
         {
           "name": "Logout Staff",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{staff_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staff_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/auth/logout"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{staff_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/auth/logout"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"logout berhasil\",\n  \"data\": null\n}"
+            }
+          ]
         }
       ]
     },
@@ -463,20 +1263,61 @@
       "name": "04 - Owner Transactions & Reports",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
           "name": "Create Backdated Income",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{income_category_id}},\n  \"amount\": 100000,\n  \"type\": \"income\",\n  \"description\": \"Penjualan tunai\",\n  \"date\": \"2026-01-15\"\n}"
             },
             "url": "{{base_url}}/transactions"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/transactions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{income_category_id}},\n  \"amount\": 100000,\n  \"type\": \"income\",\n  \"description\": \"Penjualan tunai\",\n  \"date\": \"2026-01-15\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil disimpan\",\n  \"data\": {\n    \"id\": 5,\n    \"business_id\": 1,\n    \"wallet_id\": 1,\n    \"category_id\": 2,\n    \"created_by_user_id\": 1,\n    \"amount\": 100000,\n    \"type\": \"income\",\n    \"description\": \"Penjualan tunai\",\n    \"date\": \"2026-01-15\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null,\n    \"wallet\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\",\n      \"balance\": 185000\n    },\n    \"category\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\"\n    },\n    \"created_by\": {\n      \"id\": 1,\n      \"name\": \"Owner Demo\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\"\n    },\n    \"photos\": []\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Create Owner Expense",
@@ -495,20 +1336,188 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 15000,\n  \"type\": \"expense\",\n  \"description\": \"Biaya operasional\"\n}"
             },
             "url": "{{base_url}}/transactions"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/transactions",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 15000,\n  \"type\": \"expense\",\n  \"description\": \"Biaya operasional\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil disimpan\",\n  \"data\": {\n    \"id\": 3,\n    \"business_id\": 1,\n    \"wallet_id\": 1,\n    \"category_id\": 2,\n    \"created_by_user_id\": 1,\n    \"amount\": 15000,\n    \"type\": \"expense\",\n    \"description\": \"Biaya operasional\",\n    \"date\": \"2026-09-16\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null,\n    \"wallet\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\",\n      \"balance\": 185000\n    },\n    \"category\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\"\n    },\n    \"created_by\": {\n      \"id\": 1,\n      \"name\": \"Owner Demo\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\"\n    },\n    \"photos\": []\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Owner Expense with Photo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('transaction with photo created', function () { pm.expect(pm.response.code).to.eql(201); });",
+                  "pm.collectionVariables.set('owner_transaction_id', json.data.id);",
+                  "if (json.data.photos && json.data.photos.length) { pm.collectionVariables.set('transaction_photo_id', json.data.photos[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "wallet_id",
+                  "value": "{{wallet_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{expense_category_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "amount",
+                  "value": "12000",
+                  "type": "text"
+                },
+                {
+                  "key": "type",
+                  "value": "expense",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Bukti foto transaksi",
+                  "type": "text"
+                },
+                {
+                  "key": "photos",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": "{{base_url}}/transactions"
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{base_url}}/transactions",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "wallet_id",
+                      "value": "{{wallet_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "category_id",
+                      "value": "{{expense_category_id}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "amount",
+                      "value": "12000",
+                      "type": "text"
+                    },
+                    {
+                      "key": "type",
+                      "value": "expense",
+                      "type": "text"
+                    },
+                    {
+                      "key": "description",
+                      "value": "Bukti foto transaksi",
+                      "type": "text"
+                    },
+                    {
+                      "key": "photos",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil disimpan\",\n  \"data\": {\n    \"id\": 6,\n    \"business_id\": 1,\n    \"wallet_id\": 1,\n    \"category_id\": 2,\n    \"created_by_user_id\": 1,\n    \"amount\": 12000,\n    \"type\": \"expense\",\n    \"description\": \"Bukti foto transaksi\",\n    \"date\": \"2026-09-16\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null,\n    \"wallet\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\",\n      \"balance\": 185000\n    },\n    \"category\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\"\n    },\n    \"created_by\": {\n      \"id\": 1,\n      \"name\": \"Owner Demo\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\"\n    },\n    \"photos\": [\n      {\n        \"id\": 1,\n        \"url\": \"/uploads/transactions/1/ab12cd34.jpg\"\n      }\n    ]\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Owner Transaction History with Filters",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/transactions?wallet_id={{wallet_id}}&category_id={{expense_category_id}}&creator_id={{staff_id}}&type=expense&from_date=2020-01-01&to_date=2030-12-31&page=1&per_page=15"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/transactions?wallet_id={{wallet_id}}&category_id={{expense_category_id}}&creator_id={{staff_id}}&type=expense&from_date=2020-01-01&to_date=2030-12-31&page=1&per_page=15"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 6,\n      \"business_id\": 1,\n      \"wallet_id\": 1,\n      \"category_id\": 2,\n      \"created_by_user_id\": 1,\n      \"amount\": 15000,\n      \"type\": \"expense\",\n      \"description\": \"Bukti foto transaksi\",\n      \"date\": \"2026-09-16\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null,\n      \"wallet\": {\n        \"id\": 1,\n        \"business_id\": 1,\n        \"name\": \"Cash\",\n        \"currency\": \"IDR\",\n        \"balance\": 185000\n      },\n      \"category\": {\n        \"id\": 2,\n        \"business_id\": 1,\n        \"name\": \"Pembelian\",\n        \"type\": \"expense\"\n      },\n      \"created_by\": {\n        \"id\": 1,\n        \"name\": \"Owner Demo\",\n        \"role\": \"OWNER\",\n        \"profile_photo\": \"\"\n      },\n      \"photos\": [\n        {\n          \"id\": 1,\n          \"url\": \"/uploads/transactions/1/ab12cd34.jpg\"\n        }\n      ]\n    },\n    {\n      \"id\": 3,\n      \"business_id\": 1,\n      \"wallet_id\": 1,\n      \"category_id\": 2,\n      \"created_by_user_id\": 1,\n      \"amount\": 15000,\n      \"type\": \"expense\",\n      \"description\": \"Biaya operasional\",\n      \"date\": \"2026-09-16\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": null,\n      \"wallet\": {\n        \"id\": 1,\n        \"business_id\": 1,\n        \"name\": \"Cash\",\n        \"currency\": \"IDR\",\n        \"balance\": 185000\n      },\n      \"category\": {\n        \"id\": 2,\n        \"business_id\": 1,\n        \"name\": \"Pembelian\",\n        \"type\": \"expense\"\n      },\n      \"created_by\": {\n        \"id\": 1,\n        \"name\": \"Owner Demo\",\n        \"role\": \"OWNER\",\n        \"profile_photo\": \"\"\n      },\n      \"photos\": []\n    }\n  ],\n  \"meta\": {\n    \"current_page\": 1,\n    \"per_page\": 15,\n    \"total\": 2,\n    \"last_page\": 1,\n    \"from\": 1,\n    \"to\": 2\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Owner Dashboard",
@@ -531,7 +1540,28 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/dashboard/summary"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/dashboard/summary"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"dashboard berhasil diambil\",\n  \"data\": {\n    \"total_balance\": 185000,\n    \"current_month_income\": 250000,\n    \"current_month_expense\": 65000,\n    \"net_cashflow\": 185000,\n    \"transaction_count\": 12,\n    \"latest_transactions\": [\n      {\n        \"id\": 6,\n        \"business_id\": 1,\n        \"wallet_id\": 1,\n        \"category_id\": 2,\n        \"created_by_user_id\": 1,\n        \"amount\": 15000,\n        \"type\": \"expense\",\n        \"description\": \"Bukti foto transaksi\",\n        \"date\": \"2026-09-16\",\n        \"created_at\": \"2026-09-16T09:00:00+07:00\",\n        \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n        \"deleted_at\": null,\n        \"wallet\": {\n          \"id\": 1,\n          \"business_id\": 1,\n          \"name\": \"Cash\",\n          \"currency\": \"IDR\",\n          \"balance\": 185000\n        },\n        \"category\": {\n          \"id\": 2,\n          \"business_id\": 1,\n          \"name\": \"Pembelian\",\n          \"type\": \"expense\"\n        },\n        \"created_by\": {\n          \"id\": 1,\n          \"name\": \"Owner Demo\",\n          \"role\": \"OWNER\",\n          \"profile_photo\": \"\"\n        },\n        \"photos\": [\n          {\n            \"id\": 1,\n            \"url\": \"/uploads/transactions/1/ab12cd34.jpg\"\n          }\n        ]\n      },\n      {\n        \"id\": 3,\n        \"business_id\": 1,\n        \"wallet_id\": 1,\n        \"category_id\": 2,\n        \"created_by_user_id\": 1,\n        \"amount\": 15000,\n        \"type\": \"expense\",\n        \"description\": \"Biaya operasional\",\n        \"date\": \"2026-09-16\",\n        \"created_at\": \"2026-09-16T09:00:00+07:00\",\n        \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n        \"deleted_at\": null,\n        \"wallet\": {\n          \"id\": 1,\n          \"business_id\": 1,\n          \"name\": \"Cash\",\n          \"currency\": \"IDR\",\n          \"balance\": 185000\n        },\n        \"category\": {\n          \"id\": 2,\n          \"business_id\": 1,\n          \"name\": \"Pembelian\",\n          \"type\": \"expense\"\n        },\n        \"created_by\": {\n          \"id\": 1,\n          \"name\": \"Owner Demo\",\n          \"role\": \"OWNER\",\n          \"profile_photo\": \"\"\n        },\n        \"photos\": []\n      }\n    ]\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Monthly Report",
@@ -561,33 +1591,170 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/reports/monthly?year={{report_year}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/reports/monthly?year={{report_year}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"laporan bulanan berhasil diambil\",\n  \"data\": [\n    {\n      \"month\": \"2026-01\",\n      \"income\": 100000,\n      \"expense\": 0,\n      \"net_cashflow\": 100000\n    },\n    {\n      \"month\": \"2026-02\",\n      \"income\": 0,\n      \"expense\": 5000,\n      \"net_cashflow\": -5000\n    },\n    {\n      \"month\": \"2026-03\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-04\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-05\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-06\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-07\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-08\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-09\",\n      \"income\": 150000,\n      \"expense\": 60000,\n      \"net_cashflow\": 90000\n    },\n    {\n      \"month\": \"2026-10\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-11\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    },\n    {\n      \"month\": \"2026-12\",\n      \"income\": 0,\n      \"expense\": 0,\n      \"net_cashflow\": 0\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Edit Owner Transaction",
           "request": {
             "method": "PUT",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 10000,\n  \"type\": \"expense\",\n  \"description\": \"Biaya operasional dikoreksi\"\n}"
             },
             "url": "{{base_url}}/transactions/{{owner_transaction_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/transactions/{{owner_transaction_id}}",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"wallet_id\": {{wallet_id}},\n  \"category_id\": {{expense_category_id}},\n  \"amount\": 10000,\n  \"type\": \"expense\",\n  \"description\": \"Biaya operasional dikoreksi\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil diperbarui\",\n  \"data\": {\n    \"id\": 3,\n    \"business_id\": 1,\n    \"wallet_id\": 1,\n    \"category_id\": 2,\n    \"created_by_user_id\": 1,\n    \"amount\": 10000,\n    \"type\": \"expense\",\n    \"description\": \"Biaya operasional dikoreksi\",\n    \"date\": \"2026-09-16\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:05:00+07:00\",\n    \"deleted_at\": null,\n    \"wallet\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\",\n      \"balance\": 185000\n    },\n    \"category\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\"\n    },\n    \"created_by\": {\n      \"id\": 1,\n      \"name\": \"Owner Demo\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\"\n    },\n    \"photos\": []\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Void Owner Transaction",
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/transactions/{{owner_transaction_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/transactions/{{owner_transaction_id}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil di-void\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "Restore Owner Transaction",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/transactions/{{owner_transaction_id}}/restore"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{base_url}}/transactions/{{owner_transaction_id}}/restore"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"transaksi berhasil dipulihkan\",\n  \"data\": {\n    \"id\": 3,\n    \"business_id\": 1,\n    \"wallet_id\": 1,\n    \"category_id\": 2,\n    \"created_by_user_id\": 1,\n    \"amount\": 15000,\n    \"type\": \"expense\",\n    \"description\": \"Biaya operasional\",\n    \"date\": \"2026-09-16\",\n    \"created_at\": \"2026-09-16T09:00:00+07:00\",\n    \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n    \"deleted_at\": null,\n    \"wallet\": {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Cash\",\n      \"currency\": \"IDR\",\n      \"balance\": 185000\n    },\n    \"category\": {\n      \"id\": 2,\n      \"business_id\": 1,\n      \"name\": \"Pembelian\",\n      \"type\": \"expense\"\n    },\n    \"created_by\": {\n      \"id\": 1,\n      \"name\": \"Owner Demo\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\"\n    },\n    \"photos\": []\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Transaction Photo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('photo deleted', function () { pm.expect(pm.response.code).to.eql(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/transactions/{{owner_transaction_id}}/photos/{{transaction_photo_id}}"
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/transactions/{{owner_transaction_id}}/photos/{{transaction_photo_id}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"foto transaksi berhasil dihapus\",\n  \"data\": null\n}"
+            }
+          ]
         }
       ]
     },
@@ -609,13 +1776,48 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"business_name\": \"Business B\",\n  \"name\": \"Owner B\",\n  \"email\": \"{{other_owner_email}}\",\n  \"password\": \"{{other_owner_password}}\"\n}"
             },
             "url": "{{base_url}}/auth/register"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 201",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/auth/register",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"business_name\": \"Business B\",\n  \"name\": \"Owner B\",\n  \"email\": \"{{other_owner_email}}\",\n  \"password\": \"{{other_owner_password}}\"\n}"
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"registrasi berhasil\",\n  \"data\": {\n    \"user\": {\n      \"id\": 3,\n      \"business_id\": 2,\n      \"name\": \"Owner B\",\n      \"email\": \"owner-b@example.com\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    },\n    \"business\": {\n      \"id\": 2,\n      \"name\": \"Business B\"\n    }\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Login Other Business Owner",
@@ -634,13 +1836,48 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{other_owner_email}}\",\n  \"password\": \"{{other_owner_password}}\"\n}"
             },
             "url": "{{base_url}}/auth/login"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": "{{base_url}}/auth/login",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{other_owner_email}}\",\n  \"password\": \"{{other_owner_password}}\"\n}"
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"login berhasil\",\n  \"data\": {\n    \"user\": {\n      \"id\": 3,\n      \"business_id\": 2,\n      \"name\": \"Owner B\",\n      \"email\": \"owner-b@example.com\",\n      \"role\": \"OWNER\",\n      \"profile_photo\": \"\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    },\n    \"business\": {\n      \"id\": 2,\n      \"name\": \"Business B\"\n    },\n    \"access_token\": \"<access_token_b>\",\n    \"refresh_token\": \"<refresh_token_b>\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "List Business B Wallets",
@@ -659,9 +1896,40 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{other_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{other_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/wallets"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{other_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/wallets"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 2,\n      \"business_id\": 2,\n      \"name\": \"Cash\",\n      \"balance\": 0,\n      \"currency\": \"IDR\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\"\n    }\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "Owner A Cannot Read Business B Wallet",
@@ -678,9 +1946,40 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
             "url": "{{base_url}}/wallets/{{other_wallet_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Error 404",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/wallets/{{other_wallet_id}}"
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet tidak ditemukan\"\n}"
+            }
+          ]
         },
         {
           "name": "Business B Cannot Read Business A Wallet",
@@ -697,9 +1996,40 @@
           ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{other_access_token}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{other_access_token}}"
+              }
+            ],
             "url": "{{base_url}}/wallets/{{wallet_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Error 404",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{other_access_token}}"
+                  }
+                ],
+                "url": "{{base_url}}/wallets/{{wallet_id}}"
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet tidak ditemukan\"\n}"
+            }
+          ]
         }
       ]
     },
@@ -707,7 +2037,13 @@
       "name": "06 - Owner Resource Lifecycle",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
@@ -715,42 +2051,168 @@
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/wallets/{{wallet_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/wallets/{{wallet_id}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil dinonaktifkan\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "Restore Wallet",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/wallets/{{wallet_id}}/restore"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{base_url}}/wallets/{{wallet_id}}/restore"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil dipulihkan\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "Disable Expense Category",
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/categories/{{expense_category_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/categories/{{expense_category_id}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"kategori berhasil dinonaktifkan\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "Restore Expense Category",
           "request": {
             "method": "POST",
             "url": "{{base_url}}/categories/{{expense_category_id}}/restore"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{base_url}}/categories/{{expense_category_id}}/restore"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"kategori berhasil dipulihkan\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "Disable Staff",
           "request": {
             "method": "DELETE",
             "url": "{{base_url}}/staff/{{staff_id}}"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": "{{base_url}}/staff/{{staff_id}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Staff berhasil dinonaktifkan\",\n  \"data\": null\n}"
+            }
+          ]
         },
         {
           "name": "List Disabled Wallets",
           "request": {
             "method": "GET",
             "url": "{{base_url}}/wallets?status=disabled"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": "{{base_url}}/wallets?status=disabled"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"wallet berhasil diambil\",\n  \"data\": [\n    {\n      \"id\": 1,\n      \"business_id\": 1,\n      \"name\": \"Kas Tunai\",\n      \"balance\": 185000,\n      \"currency\": \"IDR\",\n      \"created_at\": \"2026-09-16T09:00:00+07:00\",\n      \"updated_at\": \"2026-09-16T09:00:00+07:00\",\n      \"deleted_at\": \"2026-09-15T12:00:00+07:00\"\n    }\n  ]\n}"
+            }
+          ]
         }
       ]
     },
@@ -758,7 +2220,13 @@
       "name": "07 - Owner Logout",
       "auth": {
         "type": "bearer",
-        "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{access_token}}",
+            "type": "string"
+          }
+        ]
       },
       "item": [
         {
@@ -777,7 +2245,28 @@
           "request": {
             "method": "POST",
             "url": "{{base_url}}/auth/logout"
-          }
+          },
+          "response": [
+            {
+              "name": "Success 200",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": "{{base_url}}/auth/logout"
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json; charset=utf-8"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"logout berhasil\",\n  \"data\": null\n}"
+            }
+          ]
         }
       ]
     }

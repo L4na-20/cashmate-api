@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 
+	"cashmate-api/config"
 	"cashmate-api/controllers"
 	"cashmate-api/middleware"
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,9 @@ import (
 // Setup registers all REST endpoints under /api.
 func Setup(r *gin.Engine) {
 	r.Use(middleware.SecurityHeaders())
+
+	// File upload (foto transaksi & foto profil) disajikan sebagai aset statis.
+	r.Static("/uploads", config.UploadDir())
 
 	api := r.Group("/api")
 	api.Use(middleware.CORS())
@@ -35,6 +39,7 @@ func Setup(r *gin.Engine) {
 	protected.Use(middleware.AuthJWT())
 	protected.POST("/auth/logout", controllers.AuthLogout)
 	protected.GET("/auth/me", controllers.AuthMe)
+	protected.PUT("/auth/me/photo", controllers.AuthUpdateProfilePhoto)
 
 	// Owner and Staff may read active Business wallets/categories and create
 	// transactions. Controllers still apply role-safe response filtering.
@@ -66,6 +71,7 @@ func Setup(r *gin.Engine) {
 	owner.PUT("/transactions/:id", controllers.TransactionsUpdate)
 	owner.DELETE("/transactions/:id", controllers.TransactionsDestroy)
 	owner.POST("/transactions/:id/restore", controllers.TransactionsRestore)
+	owner.DELETE("/transactions/:id/photos/:photo_id", controllers.TransactionPhotoDestroy)
 
 	// Temporary compatibility aliases for clients using the old names. They
 	// remain Owner-only and tenant-scoped.

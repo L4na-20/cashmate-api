@@ -35,8 +35,11 @@ services:
     env_file:
       - .env
     environment:
-      # IP nginx di dalam Docker network — untuk menghitung ClientIP yang benar.
+      # IP nginx di dalam Docker network �?" untuk menghitung ClientIP yang benar.
       TRUSTED_PROXIES: 172.20.0.10
+    volumes:
+      # Foto transaksi & foto profil tetap ada saat container di-recreate.
+      - api_uploads:/app/uploads
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8096/api/health"]
       interval: 10s
@@ -72,6 +75,7 @@ services:
 volumes:
   nginx_certbot_www:
   nginx_certbot_certs:
+  api_uploads:
 
 # Bridge network dengan subnet fix agar IP nginx bisa dipakai sebagai trusted proxy
 networks:

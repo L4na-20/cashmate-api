@@ -68,6 +68,7 @@ CORS_ORIGINS=https://<web-domain>
 | POST | `/api/auth/refresh` | Public |
 | POST | `/api/auth/logout` | Authenticated |
 | GET | `/api/auth/me` | Authenticated |
+| PUT | `/api/auth/me/photo` | Authenticated, multipart `photo` |
 | GET/POST | `/api/staff` | Owner |
 | DELETE | `/api/staff/:id` | Owner |
 | GET | `/api/wallets[/:id]` | Owner/Staff; Staff tanpa balance |
@@ -79,6 +80,8 @@ CORS_ORIGINS=https://<web-domain>
 | GET/POST | `/api/transactions` | Owner/Staff create |
 | PUT/DELETE | `/api/transactions/:id` | Owner |
 | POST | `/api/transactions/:id/restore` | Owner |
+| DELETE | `/api/transactions/:id/photos/:photo_id` | Owner |
+| GET | `/uploads/*` | Public, file foto hasil upload |
 | GET | `/api/dashboard/summary` | Owner |
 | GET | `/api/reports/monthly?year=2026` | Owner |
 
@@ -115,6 +118,42 @@ Transaction:
 ```
 
 `amount` harus `> 0`. `type` harus `income` atau `expense`. `date` hanya boleh dikirim Owner.
+
+## Upload foto
+
+Foto bukti transaksi dan foto profil dikirim sebagai `multipart/form-data`.
+
+Foto transaksi (maksimal 10 file, field `photos`):
+
+```bash
+curl -X POST http://localhost:8096/api/transactions \
+  -H "Authorization: Bearer <access_token>" \
+  -F wallet_id=1 -F category_id=2 -F amount=25000 -F type=expense \
+  -F description="Pembelian bahan" \
+  -F photos=@bukti-1.jpg -F photos=@bukti-2.png
+```
+
+`POST /api/transactions` dan `PUT /api/transactions/:id` menerima JSON (tanpa foto) maupun multipart. Foto baru pada `PUT` ditambahkan, bukan menggantikan yang lama. Foto lama dihapus lewat `DELETE /api/transactions/:id/photos/:photo_id` (Owner).
+
+Foto profil (field `photo`):
+
+```bash
+curl -X PUT http://localhost:8096/api/auth/me/photo \
+  -H "Authorization: Bearer <access_token>" \
+  -F photo=@avatar.jpg
+```
+
+Format yang diterima: JPEG, PNG, WebP. URL foto dikembalikan pada `profile_photo` (user) dan `photos` (transaksi), dan file disajikan dari `/uploads/...`.
+
+Environment terkait:
+
+```dotenv
+UPLOAD_DIR=uploads          # di-mount ke volume Docker
+UPLOAD_MAX_SIZE_MB=5
+ASSET_BASE_URL=             # opsional, prefix absolut URL foto
+```
+
+Saat production di balik Nginx dengan path `/cashmate`, set `ASSET_BASE_URL=https://<domain>/cashmate` agar URL foto dapat diakses dari luar, dan pastikan `client_max_body_size` Nginx >= `UPLOAD_MAX_SIZE_MB`.
 
 ## Response contract
 
@@ -172,6 +211,13 @@ mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
 ```bash
 mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
   < migrations/004_remove_legacy_ownership.sql
+```
+
+6. Tambahkan kolom foto dan tabel foto transaksi:
+
+```bash
+mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USER" -p "$DB_NAME" \
+  < migrations/005_add_photos.sql
 ```
 
 Migration tidak memiliki down script. Rollback dilakukan dengan restore backup. Jangan menjalankan migration versioned ulang tanpa memeriksa schema.

@@ -38,12 +38,12 @@ func TestTenantRBACAndBalanceFlow(t *testing.T) {
 	}
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
-	for _, model := range []any{&models.Transaction{}, &models.Category{}, &models.Wallet{}, &models.User{}, &models.Business{}} {
+	for _, model := range []any{&models.TransactionPhoto{}, &models.Transaction{}, &models.Category{}, &models.Wallet{}, &models.User{}, &models.Business{}} {
 		if err := db.Migrator().DropTable(model); err != nil {
 			t.Fatalf("reset test database: %v", err)
 		}
 	}
-	if err := db.AutoMigrate(&models.Business{}, &models.User{}, &models.Wallet{}, &models.Category{}, &models.Transaction{}); err != nil {
+	if err := db.AutoMigrate(&models.Business{}, &models.User{}, &models.Wallet{}, &models.Category{}, &models.Transaction{}, &models.TransactionPhoto{}); err != nil {
 		t.Fatalf("migrate test database: %v", err)
 	}
 	config.DB = db

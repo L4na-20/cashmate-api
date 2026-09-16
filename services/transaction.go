@@ -11,6 +11,7 @@ import (
 
 var ErrResourceUnavailable = errors.New("resource tidak tersedia")
 var ErrTransactionNotFound = errors.New("transaksi tidak ditemukan")
+var ErrPhotoNotFound = errors.New("foto transaksi tidak ditemukan")
 
 // Delta returns the signed balance effect of a transaction.
 func Delta(transaction models.Transaction) int64 {

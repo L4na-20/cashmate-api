@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"cashmate-api/helpers"
 	"cashmate-api/middleware"
 	"cashmate-api/models"
+	"cashmate-api/storage"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -34,13 +36,14 @@ type refreshInput struct {
 
 func userView(user *models.User) gin.H {
 	return gin.H{
-		"id":          user.ID,
-		"business_id": user.BusinessID,
-		"name":        user.Name,
-		"email":       user.Email,
-		"role":        models.NormalizeRole(user.Role),
-		"created_at":  user.CreatedAt,
-		"updated_at":  user.UpdatedAt,
+		"id":            user.ID,
+		"business_id":   user.BusinessID,
+		"name":          user.Name,
+		"email":         user.Email,
+		"role":          models.NormalizeRole(user.Role),
+		"profile_photo": user.ProfilePhoto,
+		"created_at":    user.CreatedAt,
+		"updated_at":    user.UpdatedAt,
 	}
 }
 
@@ -233,4 +236,42 @@ func AuthMe(c *gin.Context) {
 		"user":     userView(current),
 		"business": businessView(current.Business),
 	})
+}
+
+// AuthUpdateProfilePhoto memperbarui foto profil user yang sedang login dari
+// multipart field "photo". File lama dihapus setelah update berhasil.
+func AuthUpdateProfilePhoto(c *gin.Context) {
+	value, ok := c.Get("current_user")
+	current, valid := value.(*models.User)
+	if !ok || !valid {
+		helpers.Error(c, http.StatusUnauthorized, "sesi tidak valid", nil)
+		return
+	}
+
+	header, err := c.FormFile("photo")
+	if err != nil {
+		helpers.Error(c, http.StatusBadRequest, "field file 'photo' wajib diisi", nil)
+		return
+	}
+
+	url, err := storage.SaveImage(header, fmt.Sprintf("avatars/%d", current.ID))
+	if err != nil {
+		helpers.Error(c, http.StatusBadRequest, err.Error(), nil)
+		return
+	}
+
+	if err := config.DB.Model(&models.User{}).
+		Where("id = ? AND business_id = ?", current.ID, current.BusinessID).
+		Update("profile_photo", url).Error; err != nil {
+		storage.RemoveImage(url)
+		helpers.Error(c, http.StatusInternalServerError, "gagal memperbarui foto profil", nil)
+		return
+	}
+
+	if previous := current.ProfilePhoto; previous != "" && previous != url {
+		storage.RemoveImage(previous)
+	}
+	current.ProfilePhoto = url
+
+	helpers.Success(c, http.StatusOK, "foto profil berhasil diperbarui", userView(current))
 }

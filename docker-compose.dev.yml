@@ -37,6 +37,9 @@ services:
       JWT_SECRET: local-development-access-secret-change-me-32
       JWT_REFRESH_SECRET: local-development-refresh-secret-change-me-32
       CORS_ORIGINS: http://localhost:5173
+      UPLOAD_DIR: uploads
+    volumes:
+      - api_uploads_dev:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -45,3 +48,4 @@ services:
 
 volumes:
   cashmate_db_dev:
+  api_uploads_dev:

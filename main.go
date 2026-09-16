@@ -29,9 +29,14 @@ func main() {
 			&models.Wallet{},
 			&models.Category{},
 			&models.Transaction{},
+			&models.TransactionPhoto{},
 		); err != nil {
 			log.Fatalf("gagal migrasi database: %v", err)
 		}
+	}
+
+	if err := os.MkdirAll(config.UploadDir(), 0o755); err != nil {
+		log.Fatalf("gagal membuat folder upload: %v", err)
 	}
 
 	gin.SetMode(gin.ReleaseMode)

@@ -35,6 +35,9 @@ func LoadConfig() {
 	viper.SetDefault("REFRESH_TOKEN_TTL_HOURS", 168) // 7 hari
 	viper.SetDefault("APP_TIMEZONE", "Asia/Jakarta")
 	viper.SetDefault("AUTO_MIGRATE", false)
+	viper.SetDefault("UPLOAD_DIR", "uploads")
+	viper.SetDefault("UPLOAD_MAX_SIZE_MB", 5)
+	viper.SetDefault("ASSET_BASE_URL", "")
 }
 
 // JWTSecret mengembalikan secret untuk Access Token.

@@ -23,14 +23,15 @@ type staffInput struct {
 
 func staffView(user models.User) gin.H {
 	return gin.H{
-		"id":          user.ID,
-		"business_id": user.BusinessID,
-		"name":        user.Name,
-		"email":       user.Email,
-		"role":        models.NormalizeRole(user.Role),
-		"created_at":  user.CreatedAt,
-		"updated_at":  user.UpdatedAt,
-		"deleted_at":  user.DeletedAt,
+		"id":            user.ID,
+		"business_id":   user.BusinessID,
+		"name":          user.Name,
+		"email":         user.Email,
+		"role":          models.NormalizeRole(user.Role),
+		"profile_photo": user.ProfilePhoto,
+		"created_at":    user.CreatedAt,
+		"updated_at":    user.UpdatedAt,
+		"deleted_at":    user.DeletedAt,
 	}
 }
 
